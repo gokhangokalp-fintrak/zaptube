@@ -66,3 +66,49 @@ export interface UserChannelPreference {
   created_at: string;
   updated_at: string;
 }
+
+// Chat System
+export interface ChatRoom {
+  id: string;
+  slug: string;
+  name: string;
+  type: 'general' | 'team' | 'channel';
+  emoji?: string;
+  color?: string;
+  created_at?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  room_id: string;
+  user_id: string;
+  user_name: string;
+  user_avatar?: string;
+  content: string;
+  created_at: string;
+  reactions?: ReactionCount[];
+}
+
+export interface ReactionCount {
+  emoji: string;
+  count: number;
+  user_reacted: boolean;
+}
+
+export interface ChatRoomStats {
+  room: ChatRoom;
+  totalMessages: number;
+  activeUsers: number;
+  last24hMessages: number;
+  topUsers: { name: string; count: number }[];
+}
+
+// Ad System
+export interface SponsorData {
+  id: string;
+  name: string;
+  image: string;
+  link: string;
+  slot: string;
+  active: boolean;
+}

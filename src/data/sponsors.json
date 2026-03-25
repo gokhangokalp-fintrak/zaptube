@@ -1,0 +1,40 @@
+{
+  "sponsors": [
+    {
+      "id": "nesine",
+      "name": "Nesine.com",
+      "image": "/images/sponsors/nesine.png",
+      "link": "https://www.nesine.com",
+      "slot": "sidebar",
+      "active": true,
+      "tagline": "Heyecan burada!"
+    },
+    {
+      "id": "bein",
+      "name": "beIN SPORTS",
+      "image": "/images/sponsors/bein.png",
+      "link": "https://www.beinsports.com.tr",
+      "slot": "player-bottom",
+      "active": true,
+      "tagline": "Tüm maçlar burada"
+    },
+    {
+      "id": "nike",
+      "name": "Nike Football",
+      "image": "/images/sponsors/nike.png",
+      "link": "https://www.nike.com.tr",
+      "slot": "preroll",
+      "active": true,
+      "tagline": "Just Do It"
+    },
+    {
+      "id": "tff",
+      "name": "TFF",
+      "image": "/images/sponsors/tff.png",
+      "link": "https://www.tff.org",
+      "slot": "stats-inline",
+      "active": true,
+      "tagline": "Türkiye Futbol Federasyonu"
+    }
+  ]
+}

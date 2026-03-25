@@ -1,336 +1,505 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
-import channelData from '@/data/channels.json';
-import { ChannelData, ChannelStats } from '@/types';
-import { formatViewCount } from '@/lib/youtube';
+import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
+import channelData from '@/data/channels.json'
+import AdBanner from '@/components/ads/AdBanner'
+import { formatViewCount } from '@/lib/youtube'
 
-const data = channelData as ChannelData;
-
-type SortKey = 'subscribers' | 'views' | 'videos' | 'engagement';
-
-function formatNumber(num: string): string {
-  const n = parseInt(num);
-  if (isNaN(n)) return num;
-  return n.toLocaleString('tr-TR');
+interface Channel {
+  id: string
+  name: string
+  slug: string
+  team: string
+  youtube_channel_id: string
+  contentTypes: string[]
 }
 
-function calcEngagement(stats: ChannelStats): number {
-  const views = parseInt(stats.viewCount) || 0;
-  const subs = parseInt(stats.subscriberCount) || 1;
-  const videos = parseInt(stats.videoCount) || 1;
-  // Average views per video / subscribers * 100
-  return ((views / videos) / subs) * 100;
+interface ChannelStats extends Channel {
+  subscribers: number
+  totalViews: number
+  totalVideos: number
+  engagement: number
 }
 
-function getRankBadge(rank: number): string {
-  if (rank === 1) return '🥇';
-  if (rank === 2) return '🥈';
-  if (rank === 3) return '🥉';
-  return `#${rank}`;
+interface ChatRoomStats {
+  room: {
+    id: string
+    slug: string
+    name: string
+    type: string
+    emoji: string
+    color: string
+  }
+  totalMessages: number
+  activeUsers: number
+  last24hMessages: number
+  topUsers: Array<{ name: string; count: number }>
 }
 
-function BarChart({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
-  return (
-    <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
-    </div>
-  );
+interface ChatStatsResponse {
+  rooms: ChatRoomStats[]
+  totals: {
+    totalMessages: number
+    totalActiveUsers: number
+    totalLast24h: number
+    topEmoji: string
+  }
 }
+
+type SortOption = 'subscribers' | 'views' | 'videos' | 'engagement'
 
 export default function StatsPage() {
-  const [stats, setStats] = useState<ChannelStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>('subscribers');
-  const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const [channelStats, setChannelStats] = useState<ChannelStats[]>([])
+  const [chatStats, setChatStats] = useState<ChatStatsResponse | null>(null)
+  const [loadingChannels, setLoadingChannels] = useState(true)
+  const [loadingChat, setLoadingChat] = useState(true)
+  const [channelSort, setChannelSort] = useState<SortOption>('subscribers')
+  const [selectedTeam, setSelectedTeam] = useState<string | null>(null)
 
-  // Fetch channel stats
+  // Fetch data on mount
   useEffect(() => {
-    const ytIds = data.channels.map((ch) => ch.youtubeChannelId).join(',');
-    fetch(`/api/channel-stats?channelIds=${ytIds}`)
-      .then((r) => r.json())
-      .then((d) => setStats(d.stats || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  // Filter by team
-  const filteredStats = useMemo(() => {
-    if (!selectedTeam || selectedTeam === 'genel') return stats;
-    const teamChannelIds = data.channels
-      .filter((ch) => ch.teams.includes(selectedTeam))
-      .map((ch) => ch.youtubeChannelId);
-    return stats.filter((s) => teamChannelIds.includes(s.channelId));
-  }, [stats, selectedTeam]);
-
-  // Sort
-  const sortedStats = useMemo(() => {
-    return [...filteredStats].sort((a, b) => {
-      switch (sortKey) {
-        case 'subscribers':
-          return parseInt(b.subscriberCount) - parseInt(a.subscriberCount);
-        case 'views':
-          return parseInt(b.viewCount) - parseInt(a.viewCount);
-        case 'videos':
-          return parseInt(b.videoCount) - parseInt(a.videoCount);
-        case 'engagement':
-          return calcEngagement(b) - calcEngagement(a);
-        default:
-          return 0;
+    const fetchData = async () => {
+      try {
+        // Fetch chat stats
+        const chatResponse = await fetch('/api/chat-stats')
+        if (chatResponse.ok) {
+          const chatData = await chatResponse.json()
+          setChatStats(chatData)
+        }
+      } catch (error) {
+        console.error('Error fetching chat stats:', error)
+      } finally {
+        setLoadingChat(false)
       }
-    });
-  }, [filteredStats, sortKey]);
 
-  // Max values for bar charts
-  const maxSubs = Math.max(...sortedStats.map((s) => parseInt(s.subscriberCount) || 0), 1);
-  const maxViews = Math.max(...sortedStats.map((s) => parseInt(s.viewCount) || 0), 1);
-  const maxVideos = Math.max(...sortedStats.map((s) => parseInt(s.videoCount) || 0), 1);
-  const maxEng = Math.max(...sortedStats.map((s) => calcEngagement(s)), 1);
+      try {
+        // Fetch channel stats
+        const channelResponse = await fetch('/api/channel-stats')
+        if (channelResponse.ok) {
+          const data = await channelResponse.json()
+          setChannelStats(data)
+        }
+      } catch (error) {
+        console.error('Error fetching channel stats:', error)
+      } finally {
+        setLoadingChannels(false)
+      }
+    }
 
-  // ZapTube mock stats
-  const getZapStats = (channelId: string) => {
-    const ch = data.channels.find((c) => c.youtubeChannelId === channelId);
-    const seed = (ch?.name || '').length * 1337;
-    return {
-      zapViews: Math.floor((seed % 5000) + 500),
-      zapFollowers: Math.floor((seed % 200) + 20),
-      zapFavorites: Math.floor((seed % 50) + 3),
-      zapEngagement: parseFloat(((seed % 80) / 10 + 2).toFixed(1)),
-    };
-  };
+    fetchData()
+  }, [])
+
+  // Filter commentary channels (not official team channels with only "ozet" and "canli-yayin")
+  const commentaryChannels = useMemo(() => {
+    return (channelData.channels as unknown as Channel[]).filter(channel => {
+      const hasCommentaryContent = channel.contentTypes?.some((type: string) =>
+        ['yorum', 'analiz', 'sert-yorum', 'taktik'].includes(type)
+      )
+      return hasCommentaryContent
+    })
+  }, [])
+
+  // Filter channels by selected team
+  const filteredChannels = useMemo(() => {
+    let filtered = commentaryChannels
+    if (selectedTeam) {
+      filtered = filtered.filter(ch => ch.team === selectedTeam)
+    }
+    return filtered
+  }, [commentaryChannels, selectedTeam])
+
+  // Sort channels
+  const sortedChannels = useMemo(() => {
+    const sorted = [...filteredChannels].sort((a, b) => {
+      const statsA = channelStats.find(s => s.id === a.id)
+      const statsB = channelStats.find(s => s.id === b.id)
+
+      if (!statsA || !statsB) return 0
+
+      switch (channelSort) {
+        case 'subscribers':
+          return statsB.subscribers - statsA.subscribers
+        case 'views':
+          return statsB.totalViews - statsA.totalViews
+        case 'videos':
+          return statsB.totalVideos - statsA.totalVideos
+        case 'engagement':
+          return statsB.engagement - statsA.engagement
+        default:
+          return 0
+      }
+    })
+    return sorted
+  }, [filteredChannels, channelStats, channelSort])
+
+  // Get unique teams
+  const teams = useMemo(() => {
+    return Array.from(new Set(commentaryChannels.map(ch => ch.team))).sort()
+  }, [commentaryChannels])
+
+  // Find most active chat room
+  const mostActiveChatRoom = useMemo(() => {
+    if (!chatStats?.rooms) return null
+    return chatStats.rooms.reduce((max, room) =>
+      room.totalMessages > max.totalMessages ? room : max
+    )
+  }, [chatStats])
+
+  // Get top users across all rooms
+  const topGlobalUsers = useMemo(() => {
+    if (!chatStats?.rooms) return []
+    const userCounts = new Map<string, number>()
+    chatStats.rooms.forEach(room => {
+      room.topUsers.forEach(user => {
+        userCounts.set(user.name, (userCounts.get(user.name) || 0) + user.count)
+      })
+    })
+    return Array.from(userCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+  }, [chatStats])
+
+  const maxMessageCount = useMemo(() => {
+    if (!chatStats?.rooms) return 1
+    return Math.max(...chatStats.rooms.map(r => r.totalMessages), 1)
+  }, [chatStats])
 
   return (
-    <main className="min-h-screen">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5" style={{ background: 'rgba(17,24,39,0.95)', backdropFilter: 'blur(8px)' }}>
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/app" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <span className="text-xl">📺</span>
-              <h1 className="text-base font-bold tracking-tight">
-                <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">Zap</span>Tube
-              </h1>
+    <div className="min-h-screen bg-[#111827]">
+      {/* Navigation */}
+      <nav className="bg-[#1e293b] border-b border-[#334155] sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/app" className="text-2xl font-bold text-red-500">
+              ⚡ ZapTube
             </Link>
-            <nav className="flex items-center gap-1 ml-4">
-              <Link href="/app" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+            <div className="flex gap-6 text-sm">
+              <Link href="/app" className="text-gray-400 hover:text-white transition">
                 📺 Ana Sayfa
               </Link>
-              <Link href="/app/channels" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+              <Link href="/app/chat" className="text-gray-400 hover:text-white transition">
+                💬 Sohbet
+              </Link>
+              <Link href="/app/channels" className="text-gray-400 hover:text-white transition">
                 📡 Kanallar
               </Link>
-              <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400">
+              <span className="text-white font-semibold">
                 📊 Reyting
               </span>
-            </nav>
+            </div>
+          </div>
+          <div className="text-sm text-gray-400">
+            Kullanıcı Paneli
           </div>
         </div>
-      </header>
+      </nav>
 
-      <div className="max-w-7xl mx-auto px-4 mt-6">
-        {/* Page title */}
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-1">
-            <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">Reyting Tablosu</span> 📊
-          </h2>
-          <p className="text-sm text-gray-500">YouTube ve ZapTube istatistikleri — kim en çok izleniyor?</p>
-        </div>
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
+        {/* Section A: Commentary Channels Rankings */}
+        <section>
+          <h2 className="text-3xl font-bold text-white mb-6">🎙️ Yorum &amp; Haber Kanalları Reytingleri</h2>
 
-        {/* Filters & Sort */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          {/* Team filter */}
-          <div className="flex flex-wrap gap-1.5">
-            {data.teams.map((team) => {
-              const active = selectedTeam === team.id;
-              return (
+          {/* Filters */}
+          <div className="mb-6 space-y-4">
+            {/* Sort buttons */}
+            <div className="flex gap-2 flex-wrap">
+              {(['subscribers', 'views', 'videos', 'engagement'] as SortOption[]).map(option => (
                 <button
-                  key={team.id}
-                  onClick={() => setSelectedTeam(active ? null : team.id)}
-                  className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                    active
-                      ? 'bg-emerald-500/15 ring-1 ring-emerald-500/50 text-emerald-300'
-                      : 'bg-[#1e293b] text-gray-400 hover:bg-[#334155] hover:text-white'
+                  key={option}
+                  onClick={() => setChannelSort(option)}
+                  className={`px-4 py-2 rounded-lg font-medium transition ${
+                    channelSort === option
+                      ? 'bg-red-600 text-white'
+                      : 'bg-[#334155] text-gray-300 hover:bg-[#475569]'
                   }`}
                 >
-                  <span>{team.emoji}</span>
-                  <span className="hidden sm:inline">{team.name}</span>
+                  {option === 'subscribers' && 'Abone'}
+                  {option === 'views' && 'İzlenme'}
+                  {option === 'videos' && 'Video'}
+                  {option === 'engagement' && 'Etkileşim'}
                 </button>
-              );
-            })}
-          </div>
-          {/* Sort */}
-          <div className="flex gap-1.5 sm:ml-auto">
-            {([
-              { key: 'subscribers' as SortKey, label: 'Abone', emoji: '👥' },
-              { key: 'views' as SortKey, label: 'İzlenme', emoji: '👁️' },
-              { key: 'videos' as SortKey, label: 'Video', emoji: '🎬' },
-              { key: 'engagement' as SortKey, label: 'Etkileşim', emoji: '🔥' },
-            ] as const).map((opt) => (
+              ))}
+            </div>
+
+            {/* Team filter buttons */}
+            <div className="flex gap-2 flex-wrap">
               <button
-                key={opt.key}
-                onClick={() => setSortKey(opt.key)}
-                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                  sortKey === opt.key
-                    ? 'bg-yellow-500/15 ring-1 ring-yellow-500/40 text-yellow-400'
-                    : 'bg-[#1e293b] text-gray-400 hover:bg-[#334155]'
+                onClick={() => setSelectedTeam(null)}
+                className={`px-4 py-2 rounded-lg font-medium transition ${
+                  selectedTeam === null
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-[#334155] text-gray-300 hover:bg-[#475569]'
                 }`}
               >
-                <span>{opt.emoji}</span>
-                <span className="hidden sm:inline">{opt.label}</span>
+                Tüm Takımlar
               </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Stats Table */}
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="bg-[#1e293b] rounded-xl p-5 animate-pulse">
-                <div className="flex gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gray-700" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-700 rounded w-1/3" />
-                    <div className="h-3 bg-gray-700 rounded w-full" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {sortedStats.map((s, idx) => {
-              const ch = data.channels.find((c) => c.youtubeChannelId === s.channelId);
-              const rank = idx + 1;
-              const eng = calcEngagement(s);
-              const zap = getZapStats(s.channelId);
-
-              return (
-                <div
-                  key={s.channelId}
-                  className={`bg-[#1e293b] rounded-xl p-4 border transition-all hover:scale-[1.005] ${
-                    rank <= 3 ? 'border-yellow-500/20 shadow-md' : 'border-white/5'
+              {teams.map(team => (
+                <button
+                  key={team}
+                  onClick={() => setSelectedTeam(team)}
+                  className={`px-4 py-2 rounded-lg font-medium transition ${
+                    selectedTeam === team
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-[#334155] text-gray-300 hover:bg-[#475569]'
                   }`}
                 >
-                  <div className="flex gap-4">
-                    {/* Rank + Avatar */}
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className={`w-8 text-center font-black ${rank <= 3 ? 'text-lg' : 'text-sm text-gray-500'}`}>
-                        {getRankBadge(rank)}
-                      </div>
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-lg font-bold overflow-hidden">
-                        {s.thumbnail ? (
-                          <img src={s.thumbnail} alt={s.title} className="w-full h-full object-cover" />
-                        ) : (
-                          s.title[0]
-                        )}
-                      </div>
-                    </div>
+                  {team}
+                </button>
+              ))}
+            </div>
+          </div>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-sm font-bold text-white truncate">{s.title}</h3>
-                        {ch?.teams.map((t) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500 shrink-0">
-                            {data.teams.find((team) => team.id === t)?.emoji}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* YouTube Stats */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-gray-500">👥 Abone</span>
-                            <span className="text-xs font-bold text-white">{formatViewCount(s.subscriberCount)}</span>
-                          </div>
-                          <BarChart value={parseInt(s.subscriberCount)} max={maxSubs} color="#10b981" />
-                        </div>
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-gray-500">👁️ Toplam İzlenme</span>
-                            <span className="text-xs font-bold text-white">{formatViewCount(s.viewCount)}</span>
-                          </div>
-                          <BarChart value={parseInt(s.viewCount)} max={maxViews} color="#3b82f6" />
-                        </div>
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-gray-500">🎬 Video Sayısı</span>
-                            <span className="text-xs font-bold text-white">{formatNumber(s.videoCount)}</span>
-                          </div>
-                          <BarChart value={parseInt(s.videoCount)} max={maxVideos} color="#8b5cf6" />
-                        </div>
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] text-gray-500">🔥 Etkileşim</span>
-                            <span className="text-xs font-bold text-yellow-400">{eng.toFixed(1)}%</span>
-                          </div>
-                          <BarChart value={eng} max={maxEng} color="#eab308" />
-                        </div>
-                      </div>
-
-                      {/* ZapTube Stats */}
-                      <div className="mt-3 pt-3 border-t border-white/5">
-                        <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1.5 font-bold">
-                          <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">ZapTube</span> İstatistikleri
-                        </p>
-                        <div className="flex gap-4">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-gray-500">📺</span>
-                            <span className="text-[11px] text-gray-300">{zap.zapViews.toLocaleString('tr-TR')} izlenme</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-gray-500">👥</span>
-                            <span className="text-[11px] text-gray-300">{zap.zapFollowers} takipçi</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-gray-500">★</span>
-                            <span className="text-[11px] text-gray-300">{zap.zapFavorites} favori</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] text-gray-500">🔥</span>
-                            <span className="text-[11px] text-emerald-400 font-bold">{zap.zapEngagement}% etkileşim</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+          {/* Channel Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {loadingChannels ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-[#1e293b] rounded-lg p-6 animate-pulse">
+                  <div className="h-6 bg-[#334155] rounded w-3/4 mb-4" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-[#334155] rounded w-full" />
+                    <div className="h-4 bg-[#334155] rounded w-5/6" />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              ))
+            ) : (
+              sortedChannels.map((channel, index) => {
+                const stats = channelStats.find(s => s.id === channel.id)
+                const rank = index + 1
+                const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null
 
-        {/* Summary Cards */}
-        {!loading && sortedStats.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 mb-12">
-            <div className="bg-gradient-to-br from-emerald-950/40 to-[#1e293b] rounded-xl p-4 border border-emerald-500/20 text-center">
-              <p className="text-2xl font-black text-emerald-400">{sortedStats.length}</p>
-              <p className="text-[11px] text-gray-400 mt-1">Toplam Kanal</p>
-            </div>
-            <div className="bg-gradient-to-br from-blue-950/40 to-[#1e293b] rounded-xl p-4 border border-blue-500/20 text-center">
-              <p className="text-2xl font-black text-blue-400">
-                {formatViewCount(String(sortedStats.reduce((sum, s) => sum + parseInt(s.subscriberCount || '0'), 0)))}
-              </p>
-              <p className="text-[11px] text-gray-400 mt-1">Toplam Abone</p>
-            </div>
-            <div className="bg-gradient-to-br from-purple-950/40 to-[#1e293b] rounded-xl p-4 border border-purple-500/20 text-center">
-              <p className="text-2xl font-black text-purple-400">
-                {formatViewCount(String(sortedStats.reduce((sum, s) => sum + parseInt(s.viewCount || '0'), 0)))}
-              </p>
-              <p className="text-[11px] text-gray-400 mt-1">Toplam İzlenme</p>
-            </div>
-            <div className="bg-gradient-to-br from-yellow-950/40 to-[#1e293b] rounded-xl p-4 border border-yellow-500/20 text-center">
-              <p className="text-2xl font-black text-yellow-400">
-                {sortedStats.reduce((sum, s) => sum + parseInt(s.videoCount || '0'), 0).toLocaleString('tr-TR')}
-              </p>
-              <p className="text-[11px] text-gray-400 mt-1">Toplam Video</p>
-            </div>
+                return (
+                  <div
+                    key={channel.id}
+                    className="bg-[#1e293b] rounded-lg p-6 border border-[#334155] hover:border-red-500 transition"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          {rankEmoji && <span className="text-2xl">{rankEmoji}</span>}
+                          <span className="text-sm font-bold text-gray-400">#{rank}</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-white">{channel.name}</h3>
+                        <p className="text-sm text-gray-400">{channel.team}</p>
+                      </div>
+                    </div>
+
+                    {stats ? (
+                      <div className="space-y-3">
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-gray-400">Abone</span>
+                            <span className="text-sm font-semibold text-white">{formatViewCount(String(stats.subscribers))}</span>
+                          </div>
+                          <div className="w-full bg-[#0f172a] rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-red-500 to-emerald-500 h-2 rounded-full"
+                              style={{
+                                width: `${Math.min(
+                                  (stats.subscribers / Math.max(...channelStats.map(s => s.subscribers))) * 100,
+                                  100
+                                )}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm text-gray-400">İzlenme</span>
+                            <span className="text-sm font-semibold text-white">{formatViewCount(String(stats.totalViews))}</span>
+                          </div>
+                          <div className="w-full bg-[#0f172a] rounded-full h-2">
+                            <div
+                              className="bg-gradient-to-r from-red-500 to-emerald-500 h-2 rounded-full"
+                              style={{
+                                width: `${Math.min(
+                                  (stats.totalViews / Math.max(...channelStats.map(s => s.totalViews))) * 100,
+                                  100
+                                )}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center pt-2 border-t border-[#334155]">
+                          <div>
+                            <span className="text-xs text-gray-500">Video</span>
+                            <p className="text-lg font-bold text-white">{stats.totalVideos}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs text-gray-500">Etkileşim</span>
+                            <p className="text-lg font-bold text-emerald-400">{stats.engagement.toFixed(1)}%</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-400 text-sm">Veri yükleniyor...</div>
+                    )}
+                  </div>
+                )
+              })
+            )}
           </div>
-        )}
+        </section>
+
+        {/* AD PLACEMENT */}
+        <AdBanner slot="stats-inline" />
+
+        {/* Section B: Chat Activity Rankings */}
+        <section>
+          <h2 className="text-3xl font-bold text-white mb-6">💬 Chat Odaları Aktivite Sıralaması</h2>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {loadingChat ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="bg-[#1e293b] rounded-lg p-6 animate-pulse">
+                  <div className="h-6 bg-[#334155] rounded w-3/4 mb-4" />
+                  <div className="space-y-2">
+                    <div className="h-4 bg-[#334155] rounded w-full" />
+                    <div className="h-4 bg-[#334155] rounded w-5/6" />
+                  </div>
+                </div>
+              ))
+            ) : chatStats?.rooms ? (
+              chatStats.rooms
+                .sort((a, b) => b.totalMessages - a.totalMessages)
+                .map((room, index) => (
+                  <div
+                    key={room.room.id}
+                    className={`bg-[#1e293b] rounded-lg p-6 border-2 transition ${
+                      mostActiveChatRoom?.room.id === room.room.id
+                        ? 'border-yellow-500 shadow-lg shadow-yellow-500/20'
+                        : 'border-[#334155]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <span className="text-3xl">{room.room.emoji}</span>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">{room.room.name}</h3>
+                        <p className="text-xs text-gray-400">{room.room.type}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-400">Toplam Mesaj</span>
+                        <span className="text-lg font-bold text-white">{room.totalMessages}</span>
+                      </div>
+                      <div className="w-full bg-[#0f172a] rounded-full h-3">
+                        <div
+                          className="bg-gradient-to-r from-red-500 to-emerald-500 h-3 rounded-full"
+                          style={{
+                            width: `${(room.totalMessages / maxMessageCount) * 100}%`
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center pt-2 border-t border-[#334155]">
+                        <div>
+                          <span className="text-xs text-gray-500">Aktif Kullanıcı</span>
+                          <p className="text-lg font-bold text-white">{room.activeUsers}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-gray-500">Bugün</span>
+                          <p className="text-lg font-bold text-emerald-400">{room.last24hMessages}</p>
+                        </div>
+                      </div>
+
+                      {room.topUsers.length > 0 && (
+                        <div className="pt-2 border-t border-[#334155]">
+                          <span className="text-xs text-gray-500 block mb-2">En Aktif Kullanıcılar</span>
+                          <div className="space-y-1">
+                            {room.topUsers.slice(0, 3).map((user, idx) => (
+                              <div key={idx} className="flex justify-between text-xs">
+                                <span className="text-gray-300">{user.name}</span>
+                                <span className="text-gray-400">{user.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <div className="text-gray-400">Chat verisi yüklenemedi</div>
+            )}
+          </div>
+
+          {/* Top Global Users */}
+          {topGlobalUsers.length > 0 && (
+            <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
+              <h3 className="text-2xl font-bold text-white mb-6">🏆 En Aktif Kullanıcılar</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {topGlobalUsers.map((user, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between bg-[#0f172a] rounded-lg p-4 border border-[#334155]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl font-bold text-red-500">#{index + 1}</span>
+                      <span className="text-white font-semibold">{user.name}</span>
+                    </div>
+                    <span className="text-emerald-400 font-bold">{user.count} mesaj</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Section C: General Statistics */}
+        <section>
+          <h2 className="text-3xl font-bold text-white mb-6">📊 Platform Genel Bakış</h2>
+
+          {loadingChat ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-[#1e293b] rounded-lg p-6 animate-pulse">
+                  <div className="h-4 bg-[#334155] rounded w-2/3 mb-4" />
+                  <div className="h-8 bg-[#334155] rounded w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : chatStats ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
+                <p className="text-gray-400 text-sm mb-2">Toplam Mesaj</p>
+                <p className="text-4xl font-bold text-white">{chatStats.totals.totalMessages}</p>
+              </div>
+
+              <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
+                <p className="text-gray-400 text-sm mb-2">Aktif Kullanıcı</p>
+                <p className="text-4xl font-bold text-white">{chatStats.totals.totalActiveUsers}</p>
+              </div>
+
+              <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
+                <p className="text-gray-400 text-sm mb-2">Bugünkü Mesaj</p>
+                <p className="text-4xl font-bold text-emerald-400">{chatStats.totals.totalLast24h}</p>
+              </div>
+
+              <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
+                <p className="text-gray-400 text-sm mb-2">En Popüler Emoji</p>
+                <p className="text-4xl font-bold text-white">{chatStats.totals.topEmoji}</p>
+              </div>
+
+              <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
+                <p className="text-gray-400 text-sm mb-2">Toplam Kanal</p>
+                <p className="text-4xl font-bold text-white">{commentaryChannels.length}</p>
+              </div>
+
+              <div className="bg-[#1e293b] rounded-lg p-6 border border-[#334155]">
+                <p className="text-gray-400 text-sm mb-2">Toplam Oda</p>
+                <p className="text-4xl font-bold text-white">{chatStats.rooms.length}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-gray-400">İstatistik verisi yüklenemedi</div>
+          )}
+        </section>
       </div>
-    </main>
-  );
+    </div>
+  )
 }

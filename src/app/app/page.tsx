@@ -9,6 +9,8 @@ import { getMultiChannelVideos, formatViewCount, formatDate } from '@/lib/youtub
 // Mock data removed — only real YouTube API data is used
 import { createClient } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import AdBanner from '@/components/ads/AdBanner';
+import PrerollAd from '@/components/ads/PrerollAd';
 
 const data = channelData as ChannelData;
 
@@ -343,13 +345,9 @@ function PlayerModal({
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
-            {/* Sponsor overlay at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-2 pointer-events-none">
-              <p className="text-[11px] text-gray-400 text-center">
-                Bu yayın <span className="font-bold text-yellow-400">Nesine</span> sponsorluğunda
-              </p>
-            </div>
           </div>
+          {/* Player bottom ad */}
+          <AdBanner slot="player-bottom" className="mt-1" />
         </div>
 
         {/* RIGHT: Betting + Featured Channels — hidden on small screens */}
@@ -481,12 +479,8 @@ function SponsorSidebar() {
         </div>
       </div>
 
-      {/* Ad Banner Placeholder */}
-      <div className="bg-gradient-to-br from-[#1a2332] to-[#1e293b] rounded-xl border border-white/5 p-4 text-center">
-        <p className="text-[10px] text-gray-600 uppercase tracking-wider">Reklam Alanı</p>
-        <p className="text-[10px] text-gray-700 mt-1">Sponsor olarak burada yer alın</p>
-        <p className="text-[10px] text-emerald-500/50 mt-2">ads@zaptube.com</p>
-      </div>
+      {/* Sponsor Ad Banner */}
+      <AdBanner slot="sidebar" />
     </div>
   );
 }
@@ -641,6 +635,10 @@ export default function AppPage() {
   // TV Mode — auto-open on load
   const [tvBooted, setTvBooted] = useState(false);
   const [tvBootAnim, setTvBootAnim] = useState(true); // boot-up animation
+
+  // Pre-roll ad state
+  const [showPreroll, setShowPreroll] = useState(false);
+  const [pendingVideo, setPendingVideo] = useState<Video | null>(null);
 
   // Get current user
   useEffect(() => {
@@ -862,6 +860,9 @@ export default function AppPage() {
               <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400">
                 📺 Ana Sayfa
               </span>
+              <Link href="/app/chat" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                💬 Sohbet
+              </Link>
               <Link href="/app/channels" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 📡 Kanallar
               </Link>
