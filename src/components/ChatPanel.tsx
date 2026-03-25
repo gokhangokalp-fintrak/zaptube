@@ -30,6 +30,12 @@ const QUICK_REACTIONS = [
   { emoji: '👏', label: '', color: 'from-blue-500 to-blue-600' },
 ];
 
+// Sort rooms: general first, then teams, then channels
+function sortRooms(rooms: ChatRoom[]): ChatRoom[] {
+  const order: Record<string, number> = { general: 0, team: 1, channel: 2 };
+  return [...rooms].sort((a, b) => (order[a.type] ?? 3) - (order[b.type] ?? 3));
+}
+
 interface ExtendedMessage extends ChatMessage {
   likes_count?: number;
   is_pinned?: boolean;
@@ -48,6 +54,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   const [sending, setSending] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [roomLoading, setRoomLoading] = useState(false);
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set());
   const [lastSendTime, setLastSendTime] = useState(0);
   const [lastMessage, setLastMessage] = useState('');
@@ -58,6 +65,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const subscriptionRef = useRef<any>(null);
   const fakeIntervalRef = useRef<any>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const getSupabase = () => {
     if (!supabaseRef.current) supabaseRef.current = createClient();
@@ -69,6 +77,18 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   }, []);
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenu]);
 
   // Simulate online count
   useEffect(() => {
@@ -89,9 +109,10 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         if (authUser) {
           setUser(authUser);
           const roomsList = await getChatRooms();
-          setRooms(roomsList);
-          if (roomsList.length > 0) {
-            const generalRoom = roomsList.find((r) => r.type === 'general') || roomsList[0];
+          const sorted = sortRooms(roomsList);
+          setRooms(sorted);
+          if (sorted.length > 0) {
+            const generalRoom = sorted.find((r) => r.type === 'general') || sorted[0];
             setSelectedRoom(generalRoom);
             await loadMessages(generalRoom.id);
             await loadPinnedMessages(generalRoom.id);
@@ -208,13 +229,17 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   }, [selectedRoom, user]);
 
   // Handle room change
-  const [roomLoading, setRoomLoading] = useState(false);
   const handleSelectRoom = async (room: ChatRoom) => {
     if (selectedRoom?.id === room.id) return;
     setRoomLoading(true);
     setSelectedRoom(room);
     setMessages([]);
     setPinnedMessages([]);
+    // Clear fake interval
+    if (fakeIntervalRef.current) {
+      clearInterval(fakeIntervalRef.current);
+      fakeIntervalRef.current = null;
+    }
     try {
       await loadMessages(room.id);
       await loadPinnedMessages(room.id);
@@ -299,9 +324,14 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     return colors[Math.abs(hash) % colors.length];
   };
 
+  // Get important rooms for tabs: general + teams
+  const tabRooms = rooms.filter(r => r.type === 'general' || r.type === 'team');
+  // Channel rooms for dropdown only
+  const channelRooms = rooms.filter(r => r.type === 'channel');
+
   if (loading) {
     return (
-      <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10 overflow-hidden" style={{ height: '600px' }}>
+      <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10" style={{ height: '600px' }}>
         <div className="flex-1 flex items-center justify-center">
           <div className="animate-pulse text-gray-400 text-sm">Sohbet yükleniyor...</div>
         </div>
@@ -311,8 +341,8 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
 
   if (!user) {
     return (
-      <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10 overflow-hidden" style={{ height: '600px' }}>
-        <div className="p-4 border-b border-white/10 bg-[#16162a]">
+      <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10" style={{ height: '600px' }}>
+        <div className="p-4 border-b border-white/10 bg-[#16162a] rounded-t-xl">
           <h3 className="font-bold text-white text-center">CANLI SOHBET</h3>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -323,48 +353,96 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   }
 
   return (
-    <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10 overflow-hidden" style={{ height: '600px' }}>
+    <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10 relative" style={{ height: '600px' }}>
       {/* Header */}
-      <div className="p-3 border-b border-white/10 bg-[#16162a] flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-red-500 text-lg">●</span>
-          <h3 className="font-bold text-white text-sm tracking-wide">CANLI SOHBET</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <button onClick={() => setShowMenu(!showMenu)} className="text-gray-400 hover:text-white transition-colors text-lg px-1">•••</button>
-            {showMenu && (
-              <div className="absolute right-0 top-8 bg-[#0f0f23] border border-white/10 rounded-lg shadow-xl z-50 w-48 py-1 max-h-60 overflow-y-auto">
-                <div className="px-3 py-1 text-[10px] text-gray-500 uppercase font-bold">Oda Seç</div>
-                {rooms.map(room => (
-                  <button
-                    key={room.id}
-                    onClick={() => { handleSelectRoom(room); setShowMenu(false); }}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors ${selectedRoom?.id === room.id ? 'text-red-400 bg-white/5 font-bold' : 'text-gray-300 hover:bg-white/10'}`}
-                  >
-                    {selectedRoom?.id === room.id && '● '}{room.emoji} {room.name}
-                  </button>
-                ))}
-              </div>
-            )}
+      <div className="p-3 border-b border-white/10 bg-[#16162a] rounded-t-xl flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-red-500 text-lg shrink-0">●</span>
+          <div className="min-w-0">
+            <h3 className="font-bold text-white text-sm tracking-wide truncate">
+              {selectedRoom ? `${selectedRoom.emoji} ${selectedRoom.name}` : 'CANLI SOHBET'}
+            </h3>
           </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0" ref={menuRef}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+            className="text-gray-400 hover:text-white transition-colors text-lg px-1"
+          >
+            •••
+          </button>
           {onClose && (
             <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors text-lg">✕</button>
           )}
         </div>
       </div>
 
+      {/* Dropdown menu - rendered outside overflow container */}
+      {showMenu && (
+        <div
+          className="absolute right-2 top-12 bg-[#0f0f23] border border-white/10 rounded-lg shadow-2xl w-52 py-1 max-h-72 overflow-y-auto"
+          style={{ zIndex: 9999 }}
+        >
+          {/* General + Team rooms */}
+          {tabRooms.length > 0 && (
+            <>
+              <div className="px-3 py-1 text-[10px] text-gray-500 uppercase font-bold">Odalar</div>
+              {tabRooms.map(room => (
+                <button
+                  key={room.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectRoom(room);
+                    setShowMenu(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                    selectedRoom?.id === room.id
+                      ? 'text-red-400 bg-red-500/10 font-bold'
+                      : 'text-gray-300 hover:bg-white/10'
+                  }`}
+                >
+                  {selectedRoom?.id === room.id && '● '}{room.emoji} {room.name}
+                </button>
+              ))}
+            </>
+          )}
+          {/* Channel rooms */}
+          {channelRooms.length > 0 && (
+            <>
+              <div className="px-3 py-1 mt-1 text-[10px] text-gray-500 uppercase font-bold border-t border-white/5">Kanal Odaları</div>
+              {channelRooms.map(room => (
+                <button
+                  key={room.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectRoom(room);
+                    setShowMenu(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                    selectedRoom?.id === room.id
+                      ? 'text-red-400 bg-red-500/10 font-bold'
+                      : 'text-gray-300 hover:bg-white/10'
+                  }`}
+                >
+                  {selectedRoom?.id === room.id && '● '}{room.emoji} {room.name}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Online count bar */}
-      <div className="bg-gradient-to-r from-orange-600 to-red-600 px-3 py-1.5 text-center">
+      <div className="bg-gradient-to-r from-orange-600 to-red-600 px-3 py-1.5 text-center shrink-0">
         <span className="text-white text-xs font-bold">
           🔴 {onlineCount.toLocaleString('tr-TR')} KİŞİ SOHBETTE 🔥
         </span>
       </div>
 
-      {/* Room selector (compact) */}
-      {rooms.length > 1 && (
-        <div className="px-3 pt-2 pb-1 flex gap-1 overflow-x-auto">
-          {rooms.slice(0, 4).map(room => (
+      {/* Room selector tabs: general + teams */}
+      {tabRooms.length > 0 && (
+        <div className="px-3 pt-2 pb-1 flex gap-1 overflow-x-auto shrink-0">
+          {tabRooms.map(room => (
             <button
               key={room.id}
               onClick={() => handleSelectRoom(room)}
@@ -381,7 +459,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       )}
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1" style={{ scrollBehavior: 'smooth' }}>
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1 min-h-0" style={{ scrollBehavior: 'smooth' }}>
         {roomLoading && (
           <div className="flex items-center justify-center py-4">
             <div className="animate-spin text-red-400 text-lg mr-2">↻</div>
@@ -457,7 +535,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Quick Reactions */}
-      <div className="px-3 py-2 border-t border-white/10 flex gap-1 flex-wrap">
+      <div className="px-3 py-2 border-t border-white/10 flex gap-1 flex-wrap shrink-0">
         {QUICK_REACTIONS.map((reaction, idx) => (
           <button
             key={idx}
@@ -472,13 +550,13 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
 
       {/* Spam warning */}
       {spamWarning && (
-        <div className="px-3 py-1 bg-red-900/50 text-red-300 text-xs text-center">
+        <div className="px-3 py-1 bg-red-900/50 text-red-300 text-xs text-center shrink-0">
           ⚠️ {spamWarning}
         </div>
       )}
 
       {/* Message Input */}
-      <div className="p-3 border-t border-white/10 bg-[#16162a]">
+      <div className="p-3 border-t border-white/10 bg-[#16162a] shrink-0">
         <div className="flex gap-2 items-center">
           <input
             type="text"
@@ -501,7 +579,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       </div>
 
       {/* Sponsor Footer */}
-      <div className="px-3 py-2 bg-gradient-to-r from-[#0f0f23] to-[#16162a] border-t border-white/10 text-center">
+      <div className="px-3 py-2 bg-gradient-to-r from-[#0f0f23] to-[#16162a] border-t border-white/10 text-center rounded-b-xl shrink-0">
         <a href="https://www.nesine.com" target="_blank" rel="noopener noreferrer" className="text-xs text-yellow-400/80 hover:text-yellow-300 transition-colors font-medium">
           💬 SOHBET SPONSORU: <span className="font-bold">NESİNE.COM</span>
         </a>
