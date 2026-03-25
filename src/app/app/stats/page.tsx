@@ -77,7 +77,15 @@ export default function StatsPage() {
           const channelResponse = await fetch(`/api/channel-stats?channelIds=${commentaryIds}`)
           if (channelResponse.ok) {
             const data = await channelResponse.json()
-            setChannelStats(data.stats || [])
+            // Transform API response to match component expectations
+            const transformedStats = (data.stats || []).map((s: any) => ({
+              ...s,
+              subscribers: parseInt(s.subscriberCount || '0'),
+              totalViews: parseInt(s.viewCount || '0'),
+              totalVideos: parseInt(s.videoCount || '0'),
+              engagement: (parseInt(s.viewCount || '0') / Math.max(parseInt(s.subscriberCount || '1'), 1)) * 100,
+            }))
+            setChannelStats(transformedStats)
           }
         }
       } catch (error) {
@@ -119,13 +127,13 @@ export default function StatsPage() {
 
       switch (channelSort) {
         case 'subscribers':
-          return statsB.subscribers - statsA.subscribers
+          return (statsB.subscribers || 0) - (statsA.subscribers || 0)
         case 'views':
-          return statsB.totalViews - statsA.totalViews
+          return (statsB.totalViews || 0) - (statsA.totalViews || 0)
         case 'videos':
-          return statsB.totalVideos - statsA.totalVideos
+          return (statsB.totalVideos || 0) - (statsA.totalVideos || 0)
         case 'engagement':
-          return statsB.engagement - statsA.engagement
+          return (statsB.engagement || 0) - (statsA.engagement || 0)
         default:
           return 0
       }
@@ -293,14 +301,14 @@ export default function StatsPage() {
                         <div>
                           <div className="flex justify-between items-center mb-1">
                             <span className="text-sm text-gray-400">Abone</span>
-                            <span className="text-sm font-semibold text-white">{formatViewCount(String(stats.subscribers))}</span>
+                            <span className="text-sm font-semibold text-white">{formatViewCount(String(stats.subscribers || 0))}</span>
                           </div>
                           <div className="w-full bg-[#0f172a] rounded-full h-2">
                             <div
                               className="bg-gradient-to-r from-red-500 to-emerald-500 h-2 rounded-full"
                               style={{
                                 width: `${Math.min(
-                                  (stats.subscribers / Math.max(...channelStats.map(s => s.subscribers))) * 100,
+                                  ((stats.subscribers || 0) / Math.max(...channelStats.map(s => s.subscribers || 0), 1)) * 100,
                                   100
                                 )}%`
                               }}
@@ -311,14 +319,14 @@ export default function StatsPage() {
                         <div>
                           <div className="flex justify-between items-center mb-1">
                             <span className="text-sm text-gray-400">İzlenme</span>
-                            <span className="text-sm font-semibold text-white">{formatViewCount(String(stats.totalViews))}</span>
+                            <span className="text-sm font-semibold text-white">{formatViewCount(String(stats.totalViews || 0))}</span>
                           </div>
                           <div className="w-full bg-[#0f172a] rounded-full h-2">
                             <div
                               className="bg-gradient-to-r from-red-500 to-emerald-500 h-2 rounded-full"
                               style={{
                                 width: `${Math.min(
-                                  (stats.totalViews / Math.max(...channelStats.map(s => s.totalViews))) * 100,
+                                  ((stats.totalViews || 0) / Math.max(...channelStats.map(s => s.totalViews || 0), 1)) * 100,
                                   100
                                 )}%`
                               }}
@@ -329,11 +337,11 @@ export default function StatsPage() {
                         <div className="flex justify-between items-center pt-2 border-t border-[#334155]">
                           <div>
                             <span className="text-xs text-gray-500">Video</span>
-                            <p className="text-lg font-bold text-white">{stats.totalVideos}</p>
+                            <p className="text-lg font-bold text-white">{stats.totalVideos || 0}</p>
                           </div>
                           <div className="text-right">
                             <span className="text-xs text-gray-500">Etkileşim</span>
-                            <p className="text-lg font-bold text-emerald-400">{stats.engagement.toFixed(1)}%</p>
+                            <p className="text-lg font-bold text-emerald-400">{((stats.engagement || 0).toFixed(1))}%</p>
                           </div>
                         </div>
                       </div>

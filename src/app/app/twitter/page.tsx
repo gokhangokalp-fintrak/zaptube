@@ -470,7 +470,7 @@ export default function TwitterPage() {
                 📡 Kanallar
               </Link>
               <Link
-                href="/app/ratings"
+                href="/app/stats"
                 className="text-gray-400 hover:text-white transition-colors"
               >
                 📊 Reyting

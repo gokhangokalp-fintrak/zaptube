@@ -3,7 +3,7 @@
     {
       "id": "nesine",
       "name": "Nesine.com",
-      "image": "/images/sponsors/nesine.png",
+      "image": "",
       "link": "https://www.nesine.com",
       "slot": "sidebar",
       "active": true,
@@ -12,7 +12,7 @@
     {
       "id": "bein",
       "name": "beIN SPORTS",
-      "image": "/images/sponsors/bein.png",
+      "image": "",
       "link": "https://www.beinsports.com.tr",
       "slot": "player-bottom",
       "active": true,
@@ -21,7 +21,7 @@
     {
       "id": "nike",
       "name": "Nike Football",
-      "image": "/images/sponsors/nike.png",
+      "image": "",
       "link": "https://www.nike.com.tr",
       "slot": "preroll",
       "active": true,
@@ -30,7 +30,7 @@
     {
       "id": "tff",
       "name": "TFF",
-      "image": "/images/sponsors/tff.png",
+      "image": "",
       "link": "https://www.tff.org",
       "slot": "stats-inline",
       "active": true,

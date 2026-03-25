@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import AdBanner from '@/components/ads/AdBanner';
 import PrerollAd from '@/components/ads/PrerollAd';
+import ChatPanel from '@/components/ChatPanel';
 
 const data = channelData as ChannelData;
 
@@ -1068,9 +1069,10 @@ export default function AppPage() {
           </section>
         </div>
 
-        {/* Right: Sponsor Sidebar (hidden on mobile) */}
-        <div className="hidden lg:block w-72 shrink-0">
-          <div className="sticky top-20">
+        {/* Right: Sidebar (hidden on mobile) */}
+        <div className="hidden lg:block w-80 shrink-0">
+          <div className="sticky top-20 space-y-4">
+            <ChatPanel />
             <SponsorSidebar />
           </div>
         </div>

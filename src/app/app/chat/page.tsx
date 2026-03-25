@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { getChatRooms, getMessages, sendMessage, toggleReaction } from '@/lib/chat';
 import type { ChatRoom, ChatMessage, ReactionCount } from '@/types';
@@ -257,7 +258,24 @@ export default function ChatPage() {
   const userAvatar = userName.charAt(0).toUpperCase();
 
   return (
-    <div className="flex h-screen bg-[#111827]">
+    <div className="flex flex-col h-screen bg-[#111827]">
+      {/* Top Navigation */}
+      <nav className="border-b border-white/5 bg-[#111827]/95 backdrop-blur flex-shrink-0">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Link href="/app" className="text-xl font-bold text-red-500">📺 ZapTube</Link>
+            <div className="flex gap-4 text-sm">
+              <Link href="/app" className="text-gray-400 hover:text-white transition-colors">📺 Ana Sayfa</Link>
+              <span className="text-white font-semibold">💬 Sohbet</span>
+              <Link href="/app/twitter" className="text-gray-400 hover:text-white transition-colors">🐦 Twitter</Link>
+              <Link href="/app/channels" className="text-gray-400 hover:text-white transition-colors">📡 Kanallar</Link>
+              <Link href="/app/stats" className="text-gray-400 hover:text-white transition-colors">📊 Reyting</Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <div className="flex flex-1 min-h-0">
       {/* Left Sidebar */}
       <div className="flex w-64 flex-col border-r border-gray-700 bg-[#1e293b]">
         {/* Header */}
@@ -548,6 +566,7 @@ export default function ChatPage() {
             </p>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
