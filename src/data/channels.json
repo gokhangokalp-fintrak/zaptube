@@ -76,6 +76,149 @@
       "contentTypes": ["yorum", "ozet", "canli-yayin"],
       "tags": ["ts", "karadeniz", "resmi"],
       "priority": 2
+    },
+    {
+      "id": "galatasaray-sk",
+      "name": "Galatasaray SK",
+      "youtubeChannelId": "UCFtBz2JIMhLsafJB0SKjNIA",
+      "description": "Galatasaray resmi YouTube kanalı. Maç özetleri, röportajlar, GSTV özel içerikler.",
+      "thumbnail": "/images/channels/gs.jpg",
+      "teams": ["gs"],
+      "contentTypes": ["ozet", "yorum", "canli-yayin"],
+      "tags": ["gs", "resmi", "gstv"],
+      "priority": 1
+    },
+    {
+      "id": "besiktas-jk",
+      "name": "Beşiktaş JK",
+      "youtubeChannelId": "UCwVEhEzsjVFCp-PEEjGFSLw",
+      "description": "Beşiktaş resmi YouTube kanalı. BJK TV yayınları ve özel içerikler.",
+      "thumbnail": "/images/channels/bjk.jpg",
+      "teams": ["bjk"],
+      "contentTypes": ["ozet", "yorum", "canli-yayin"],
+      "tags": ["bjk", "resmi", "bjktv"],
+      "priority": 1
+    },
+    {
+      "id": "trt-spor",
+      "name": "TRT Spor",
+      "youtubeChannelId": "UCRzr2Ja7nNq0E8YMI1CG0vg",
+      "description": "TRT Spor resmi kanalı. Süper Lig özetleri, Milli Takım ve daha fazlası.",
+      "thumbnail": "/images/channels/trt.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["ozet", "analiz", "canli-yayin"],
+      "tags": ["trt", "resmi", "milli takım"],
+      "priority": 1
+    },
+    {
+      "id": "a-spor",
+      "name": "A Spor",
+      "youtubeChannelId": "UCHJiP3x5Gp8mMLSoqELcbA",
+      "description": "A Spor resmi YouTube kanalı. Transfer haberleri, maç analizleri.",
+      "thumbnail": "/images/channels/aspor.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum", "analiz", "sert-yorum"],
+      "tags": ["aspor", "haber", "transfer"],
+      "priority": 2
+    },
+    {
+      "id": "tivibu-spor",
+      "name": "tivibu Spor",
+      "youtubeChannelId": "UCMrWUGrKic5VKKBa7hJZnZQ",
+      "description": "tivibu Spor kanalı. Süper Lig maç özetleri ve analizler.",
+      "thumbnail": "/images/channels/tivibu.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["ozet", "analiz"],
+      "tags": ["tivibu", "özet", "analiz"],
+      "priority": 3
+    },
+    {
+      "id": "sokak-aglatan",
+      "name": "Sokağın Ağlatanı",
+      "youtubeChannelId": "UChDJfWJbMN7RY7J_FQCdU7Q",
+      "description": "Sokak röportajları ve taraftar tepkileri. En samimi yorumlar.",
+      "thumbnail": "/images/channels/sokak.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["eglence", "yorum"],
+      "tags": ["sokak", "taraftar", "röportaj"],
+      "priority": 3
+    },
+    {
+      "id": "futbol-arena",
+      "name": "Futbol Arena",
+      "youtubeChannelId": "UCQ2rkiH1SHrpxFPbOqVjC1g",
+      "description": "Futbol haberleri, transfer dedikoduları ve detaylı analizler.",
+      "thumbnail": "/images/channels/arena.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["analiz", "yorum"],
+      "tags": ["haber", "transfer", "analiz"],
+      "priority": 3
+    },
+    {
+      "id": "rıdvan-dilmen",
+      "name": "Rıdvan Dilmen",
+      "youtubeChannelId": "UCqR1ZJiipKN5Z-1kNs_LKSA",
+      "description": "Efsane futbolcu ve yorumcu. %100 Futbol'un yıldızı.",
+      "thumbnail": "/images/channels/ridvan.jpg",
+      "teams": ["fb", "genel"],
+      "contentTypes": ["yorum", "analiz", "sert-yorum"],
+      "tags": ["efsane", "100futbol", "ridvan"],
+      "priority": 1
+    },
+    {
+      "id": "ertem-sener",
+      "name": "Ertem Şener",
+      "youtubeChannelId": "UCR-JKx5K3VlXkaSpPwacBaw",
+      "description": "Deneyimli spor sunucusu. Tartışma programları ve maç yorumları.",
+      "thumbnail": "/images/channels/ertem.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum", "sert-yorum", "canli-yayin"],
+      "tags": ["sunucu", "tartışma", "yorumcu"],
+      "priority": 2
+    },
+    {
+      "id": "emre-ozcan",
+      "name": "Emre Özcan",
+      "youtubeChannelId": "UCHhPSkgk6nyLjwsmiFcKhkA",
+      "description": "Genç nesil futbol yorumcusu. Eğlenceli ve enerjik anlatım.",
+      "thumbnail": "/images/channels/emre.jpg",
+      "teams": ["gs", "genel"],
+      "contentTypes": ["yorum", "eglence", "canli-yayin"],
+      "tags": ["genç", "eğlence", "enerji"],
+      "priority": 2
+    },
+    {
+      "id": "ilker-denizci",
+      "name": "İlker Denizcier",
+      "youtubeChannelId": "UCKkz2kN3g0wTm3QFMYfyQGg",
+      "description": "Eski milli futbolcu. Teknik direktörlük deneyimiyle derinlikli yorumlar.",
+      "thumbnail": "/images/channels/ilker.jpg",
+      "teams": ["ts", "genel"],
+      "contentTypes": ["analiz", "taktik", "yorum"],
+      "tags": ["teknik", "taktik", "deneyimli"],
+      "priority": 2
+    },
+    {
+      "id": "onur-tukel",
+      "name": "Onur Tükel",
+      "youtubeChannelId": "UC0mzJzz4P9KUFocHBXPp8WQ",
+      "description": "Spor gazetecisi. Detaylı transfer haberleri ve iç piyasa bilgileri.",
+      "thumbnail": "/images/channels/onur.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum", "analiz"],
+      "tags": ["gazeteci", "transfer", "detay"],
+      "priority": 3
+    },
+    {
+      "id": "super-lig-ozet",
+      "name": "Süper Lig Özetleri",
+      "youtubeChannelId": "UCjTJicSi3Q2hhPG_-ky6UlA",
+      "description": "Tüm Süper Lig maç özetleri, goller ve önemli pozisyonlar.",
+      "thumbnail": "/images/channels/superlig.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["ozet"],
+      "tags": ["özet", "gol", "superlig"],
+      "priority": 1
     }
   ],
   "teams": [

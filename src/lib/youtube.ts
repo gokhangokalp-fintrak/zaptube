@@ -1,4 +1,4 @@
-import { Video } from '@/types';
+import { Video, ChannelStats } from '@/types';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
@@ -113,6 +113,48 @@ export async function getMultiChannelVideos(
 
   setCache(cacheKey, result);
   return result;
+}
+
+// =============================================
+// CHANNEL STATISTICS
+// =============================================
+const statsCache = new Map<string, { data: ChannelStats[]; timestamp: number }>();
+
+export async function getChannelStats(
+  channelIds: string[],
+  apiKey: string
+): Promise<ChannelStats[]> {
+  const cacheKey = `stats:${channelIds.sort().join(',')}`;
+  const cached = statsCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  try {
+    const ids = channelIds.join(',');
+    const res = await fetch(
+      `${YOUTUBE_API_BASE}/channels?part=snippet,statistics&id=${ids}&key=${apiKey}`
+    );
+    if (!res.ok) throw new Error('YouTube Channels API failed');
+    const data = await res.json();
+
+    const stats: ChannelStats[] = (data.items || []).map((item: any) => ({
+      channelId: item.id,
+      title: item.snippet.title,
+      description: item.snippet.description,
+      thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '',
+      subscriberCount: item.statistics.subscriberCount || '0',
+      viewCount: item.statistics.viewCount || '0',
+      videoCount: item.statistics.videoCount || '0',
+      publishedAt: item.snippet.publishedAt,
+    }));
+
+    statsCache.set(cacheKey, { data: stats, timestamp: Date.now() });
+    return stats;
+  } catch (error) {
+    console.error('Channel stats error:', error);
+    return [];
+  }
 }
 
 function parseDuration(isoDuration?: string): string {

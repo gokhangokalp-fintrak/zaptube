@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import channelData from '@/data/channels.json';
 import { Video, ChannelData } from '@/types';
 import { getMultiChannelVideos, formatViewCount, formatDate } from '@/lib/youtube';
@@ -848,14 +849,26 @@ export default function AppPage() {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/5" style={{ background: 'rgba(17,24,39,0.95)', backdropFilter: 'blur(8px)' }}>
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">📺</span>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight">
-                <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">Zap</span>Tube
-              </h1>
-              <p className="text-xs text-gray-500 hidden sm:block">YouTube futbol kumandan</p>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">📺</span>
+              <div>
+                <h1 className="text-lg font-bold tracking-tight">
+                  <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">Zap</span>Tube
+                </h1>
+              </div>
             </div>
+            <nav className="flex items-center gap-1 ml-2">
+              <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400">
+                📺 Ana Sayfa
+              </span>
+              <Link href="/app/channels" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                📡 Kanallar
+              </Link>
+              <Link href="/app/stats" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                📊 Reyting
+              </Link>
+            </nav>
           </div>
           <div className="flex items-center gap-3">
             {liveVideos.length > 0 && (

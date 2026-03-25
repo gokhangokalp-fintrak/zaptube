@@ -43,3 +43,26 @@ export interface ChannelData {
   teams: Team[];
   contentTypes: ContentType[];
 }
+
+// YouTube Channel Statistics
+export interface ChannelStats {
+  channelId: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  subscriberCount: string;
+  viewCount: string;
+  videoCount: string;
+  publishedAt: string; // channel creation date
+}
+
+// User's channel preference (follow/favorite)
+export interface UserChannelPreference {
+  id: string;
+  user_id: string;
+  channel_id: string; // matches Channel.id
+  is_following: boolean;
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+}
