@@ -490,10 +490,10 @@ export default function AppPage() {
     }
 
     const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
-    const channelYtIds = filteredChannels.map((ch) => ch.youtubeChannelId);
+    const realChannels = filteredChannels.filter((ch) => ch.youtubeChannelId.startsWith('UC'));
+    const channelYtIds = realChannels.map((ch) => ch.youtubeChannelId);
 
-    const hasRealIds = channelYtIds.every((id) => id.startsWith('UC'));
-    if (!apiKey || !hasRealIds) {
+    if (!apiKey || channelYtIds.length === 0) {
       const channelIds = filteredChannels.map((ch) => ch.id);
       setVideos(getMockVideosForChannels(channelIds));
       return;
