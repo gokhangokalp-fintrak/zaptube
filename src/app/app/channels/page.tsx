@@ -115,6 +115,12 @@ export default function ChannelsPage() {
               <Link href="/app" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 📺 Ana Sayfa
               </Link>
+              <Link href="/app/chat" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                💬 Sohbet
+              </Link>
+              <Link href="/app/twitter" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                🐦 Twitter
+              </Link>
               <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400">
                 📡 Kanallar
               </span>

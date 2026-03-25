@@ -6,20 +6,13 @@ import channelData from '@/data/channels.json'
 import AdBanner from '@/components/ads/AdBanner'
 import { formatViewCount } from '@/lib/youtube'
 
-interface Channel {
-  id: string
-  name: string
-  slug: string
-  team: string
-  youtube_channel_id: string
-  contentTypes: string[]
-}
-
-interface ChannelStats extends Channel {
-  subscribers: number
-  totalViews: number
-  totalVideos: number
-  engagement: number
+// Using any for channel data from JSON to avoid type conflicts
+interface LocalChannelStats {
+  channelId: string
+  title: string
+  subscriberCount: string
+  viewCount: string
+  videoCount: string
 }
 
 interface ChatRoomStats {
@@ -50,7 +43,7 @@ interface ChatStatsResponse {
 type SortOption = 'subscribers' | 'views' | 'videos' | 'engagement'
 
 export default function StatsPage() {
-  const [channelStats, setChannelStats] = useState<ChannelStats[]>([])
+  const [channelStats, setChannelStats] = useState<any[]>([])
   const [chatStats, setChatStats] = useState<ChatStatsResponse | null>(null)
   const [loadingChannels, setLoadingChannels] = useState(true)
   const [loadingChat, setLoadingChat] = useState(true)
@@ -74,11 +67,18 @@ export default function StatsPage() {
       }
 
       try {
-        // Fetch channel stats
-        const channelResponse = await fetch('/api/channel-stats')
-        if (channelResponse.ok) {
-          const data = await channelResponse.json()
-          setChannelStats(data)
+        // Fetch channel stats - get all commentary channel IDs
+        const commentaryIds = (channelData.channels as any[])
+          .filter((ch: any) => ch.contentTypes?.some((t: string) => ['yorum', 'analiz', 'sert-yorum', 'taktik'].includes(t)))
+          .map((ch: any) => ch.youtubeChannelId)
+          .join(',')
+
+        if (commentaryIds) {
+          const channelResponse = await fetch(`/api/channel-stats?channelIds=${commentaryIds}`)
+          if (channelResponse.ok) {
+            const data = await channelResponse.json()
+            setChannelStats(data.stats || [])
+          }
         }
       } catch (error) {
         console.error('Error fetching channel stats:', error)
@@ -92,7 +92,7 @@ export default function StatsPage() {
 
   // Filter commentary channels (not official team channels with only "ozet" and "canli-yayin")
   const commentaryChannels = useMemo(() => {
-    return (channelData.channels as unknown as Channel[]).filter(channel => {
+    return (channelData.channels as any[]).filter((channel: any) => {
       const hasCommentaryContent = channel.contentTypes?.some((type: string) =>
         ['yorum', 'analiz', 'sert-yorum', 'taktik'].includes(type)
       )
@@ -112,8 +112,8 @@ export default function StatsPage() {
   // Sort channels
   const sortedChannels = useMemo(() => {
     const sorted = [...filteredChannels].sort((a, b) => {
-      const statsA = channelStats.find(s => s.id === a.id)
-      const statsB = channelStats.find(s => s.id === b.id)
+      const statsA = channelStats.find((s: any) => s.channelId === a.youtubeChannelId)
+      const statsB = channelStats.find((s: any) => s.channelId === b.youtubeChannelId)
 
       if (!statsA || !statsB) return 0
 
@@ -181,6 +181,9 @@ export default function StatsPage() {
               </Link>
               <Link href="/app/chat" className="text-gray-400 hover:text-white transition">
                 💬 Sohbet
+              </Link>
+              <Link href="/app/twitter" className="text-gray-400 hover:text-white transition">
+                🐦 Twitter
               </Link>
               <Link href="/app/channels" className="text-gray-400 hover:text-white transition">
                 📡 Kanallar
@@ -265,7 +268,7 @@ export default function StatsPage() {
               ))
             ) : (
               sortedChannels.map((channel, index) => {
-                const stats = channelStats.find(s => s.id === channel.id)
+                const stats = channelStats.find((s: any) => s.channelId === channel.youtubeChannelId)
                 const rank = index + 1
                 const rankEmoji = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null
 
