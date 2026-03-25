@@ -9,7 +9,7 @@ export default function TopScorersWidget() {
   const { data: allScorers, loading, isRealData } = useSportsData<TopScorer[]>({
     type: 'scorers',
   });
-  const scorers = (allScorers || []).slice(0, 10);
+  const scorers = (Array.isArray(allScorers) ? allScorers : []).slice(0, 10);
 
   if (loading) {
     return (

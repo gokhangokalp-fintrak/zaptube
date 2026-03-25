@@ -68,7 +68,9 @@ async function getCachedData(key: string): Promise<any | null> {
     const { createClient } = await import('@/lib/supabase');
     const supabase = createClient();
     const { data } = await supabase.rpc('get_sports_cache', { p_key: key });
-    return data || null;
+    if (!data) return null;
+    // Handle double-stringify: data might be a JSON string inside JSONB
+    return typeof data === 'string' ? JSON.parse(data) : data;
   } catch {
     return null;
   }
@@ -80,7 +82,7 @@ async function setCachedData(key: string, data: any, ttlMinutes: number): Promis
     const supabase = createClient();
     await supabase.rpc('set_sports_cache', {
       p_key: key,
-      p_data: JSON.stringify(data),
+      p_data: data,
       p_ttl_minutes: ttlMinutes,
     });
   } catch {

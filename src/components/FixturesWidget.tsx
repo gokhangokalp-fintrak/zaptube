@@ -17,7 +17,7 @@ export default function FixturesWidget() {
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
 
-  const allMatches = matches || [];
+  const allMatches = Array.isArray(matches) ? matches : [];
   const now = new Date();
   const upcomingMatches = allMatches.filter((m) => m.status === 'upcoming');
   const finishedMatches = allMatches.filter((m) => m.status === 'finished');

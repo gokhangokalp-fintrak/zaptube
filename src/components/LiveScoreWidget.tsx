@@ -23,7 +23,7 @@ export default function LiveScoreWidget() {
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const liveMatches = matches || [];
+  const liveMatches = Array.isArray(matches) ? matches : [];
   const liveCount = liveMatches.filter(m => m.status === 'live' || m.status === 'halftime').length;
 
   return (

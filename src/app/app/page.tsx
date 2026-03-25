@@ -682,7 +682,7 @@ export default function AppPage() {
     setLoading(true);
     getMultiChannelVideos(channelYtIds, apiKey, 3)
       .then((result) => {
-        setVideos(result);
+        setVideos(Array.isArray(result) ? result : []);
       })
       .catch(() => {
         setVideos([]);

@@ -59,7 +59,7 @@ export default function StandingsWidget({ selectedTeamId }: StandingsWidgetProps
             </tr>
           </thead>
           <tbody>
-            {(standings || []).map((team, index) => {
+            {(Array.isArray(standings) ? standings : []).map((team, index) => {
               const isSelected = selectedTeamId === team.shortName;
               const borderClass = getLeftBorderColor(index + 1);
 
