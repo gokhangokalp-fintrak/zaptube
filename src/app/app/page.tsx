@@ -494,14 +494,17 @@ function SponsorSidebar() {
 // LIVE BANNER
 // =============================================
 function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]; onSelect: (v: Video) => void; onMultiView: (videos: Video[]) => void }) {
-  if (liveVideos.length === 0) return null;
   return (
     <section className="mb-6 animate-slide-up">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-gray-500 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-red-500 live-pulse"></span>
-          <span className="text-red-400 font-semibold">Şu An Canlı</span>
-          <span className="text-gray-600 text-xs">({liveVideos.length} yayın)</span>
+          <span className={`w-2 h-2 rounded-full ${liveVideos.length > 0 ? 'bg-red-500 live-pulse' : 'bg-gray-600'}`}></span>
+          <span className={liveVideos.length > 0 ? 'text-red-400 font-semibold' : 'text-gray-400 font-semibold'}>
+            {liveVideos.length > 0 ? 'Şu An Canlı' : 'Canlı Yayınlar'}
+          </span>
+          {liveVideos.length > 0 && (
+            <span className="text-gray-600 text-xs">({liveVideos.length} yayın)</span>
+          )}
         </h3>
         {liveVideos.length >= 2 && (
           <button
@@ -512,34 +515,47 @@ function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]
           </button>
         )}
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollSnapType: 'x mandatory' }}>
-        {liveVideos.map((video) => (
-          <button key={video.id} onClick={() => onSelect(video)}
-            className="flex-shrink-0 w-72 bg-gradient-to-br from-red-950/40 to-[#1e293b] hover:from-red-950/60 border border-red-500/20 hover:border-red-500/40 rounded-xl overflow-hidden transition-all hover:scale-[1.02] group text-left"
-            style={{ scrollSnapAlign: 'start' }}>
-            <div className="relative aspect-video bg-gradient-to-br from-gray-800 to-gray-900">
-              {video.thumbnail && (
-                <img src={video.thumbnail} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />
-              )}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-red-600/80 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+
+      {liveVideos.length === 0 ? (
+        <div className="bg-[#1e293b] rounded-xl border border-white/5 p-6 text-center">
+          <div className="text-3xl mb-2 opacity-40">📡</div>
+          <p className="text-sm text-gray-400 font-medium">Şu an canlı yayın yok</p>
+          <p className="text-xs text-gray-600 mt-1">Takip ettiğin kanallardan biri canlıya geçtiğinde burada görünecek</p>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+            <span className="text-[10px] text-gray-600">Kanallar kontrol ediliyor...</span>
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollSnapType: 'x mandatory' }}>
+          {liveVideos.map((video) => (
+            <button key={video.id} onClick={() => onSelect(video)}
+              className="flex-shrink-0 w-72 bg-gradient-to-br from-red-950/40 to-[#1e293b] hover:from-red-950/60 border border-red-500/20 hover:border-red-500/40 rounded-xl overflow-hidden transition-all hover:scale-[1.02] group text-left"
+              style={{ scrollSnapAlign: 'start' }}>
+              <div className="relative aspect-video bg-gradient-to-br from-gray-800 to-gray-900">
+                {video.thumbnail && (
+                  <img src={video.thumbnail} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />
+                )}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-red-600/80 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                  </div>
+                </div>
+                <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
+                </div>
+                <div className="absolute bottom-2 right-2 text-[10px] text-white/70 bg-black/60 px-1.5 py-0.5 rounded">
+                  {formatViewCount(video.viewCount)} izliyor
                 </div>
               </div>
-              <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
+              <div className="p-3">
+                <p className="text-sm font-medium line-clamp-2 group-hover:text-red-400 transition-colors leading-snug">{video.title}</p>
+                <p className="text-[11px] text-gray-500 mt-1">{video.channelTitle}</p>
               </div>
-              <div className="absolute bottom-2 right-2 text-[10px] text-white/70 bg-black/60 px-1.5 py-0.5 rounded">
-                {formatViewCount(video.viewCount)} izliyor
-              </div>
-            </div>
-            <div className="p-3">
-              <p className="text-sm font-medium line-clamp-2 group-hover:text-red-400 transition-colors leading-snug">{video.title}</p>
-              <p className="text-[11px] text-gray-500 mt-1">{video.channelTitle}</p>
-            </div>
-          </button>
-        ))}
-      </div>
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
