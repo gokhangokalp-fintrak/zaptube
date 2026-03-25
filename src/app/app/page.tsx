@@ -15,6 +15,8 @@ import ChatPanel from '@/components/ChatPanel';
 import UserProfileWidget from '@/components/UserProfileWidget';
 import PollWidget from '@/components/PollWidget';
 import LiveScoreWidget from '@/components/LiveScoreWidget';
+import StandingsWidget from '@/components/StandingsWidget';
+import FixturesWidget from '@/components/FixturesWidget';
 
 const data = channelData as ChannelData;
 
@@ -350,8 +352,8 @@ function PlayerModal({
               allowFullScreen
             />
           </div>
-          {/* Player bottom ad */}
-          <AdBanner slot="player-bottom" className="mt-1" />
+          {/* İnce uzun sponsor banner — video altı */}
+          <AdBanner slot="stream-bottom" className="mt-1" />
         </div>
 
         {/* RIGHT: Betting + Featured Channels — hidden on small screens */}
@@ -864,6 +866,9 @@ export default function AppPage() {
               <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400">
                 📺 Ana Sayfa
               </span>
+              <Link href="/app/matches" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                ⚽ Maçlar
+              </Link>
               <Link href="/app/chat" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 💬 Sohbet
               </Link>
@@ -1075,11 +1080,13 @@ export default function AppPage() {
         {/* Right: Sidebar (hidden on mobile) */}
         <div className="hidden lg:block w-96 shrink-0">
           <div className="sticky top-20 space-y-4">
-            <ChatPanel />
             <LiveScoreWidget />
+            <ChatPanel />
+            <SponsorSidebar />
+            <FixturesWidget />
+            <StandingsWidget />
             <UserProfileWidget />
             <PollWidget />
-            <SponsorSidebar />
           </div>
         </div>
       </div>
