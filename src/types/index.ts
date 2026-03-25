@@ -87,6 +87,8 @@ export interface ChatMessage {
   content: string;
   created_at: string;
   reactions?: ReactionCount[];
+  likes_count?: number;
+  is_pinned?: boolean;
 }
 
 export interface ReactionCount {

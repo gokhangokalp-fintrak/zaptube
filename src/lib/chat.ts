@@ -251,3 +251,102 @@ export async function getChatStats(): Promise<ChatRoomStats[]> {
 
   return stats;
 }
+
+// Like a message (toggle)
+export async function toggleLike(
+  messageId: string,
+  userId: string
+): Promise<{ liked: boolean; newCount: number }> {
+  const supabase = createClient();
+
+  // Check if already liked
+  const { data: existing } = await supabase
+    .from('chat_likes')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('user_id', userId)
+    .single();
+
+  if (existing) {
+    // Unlike
+    await supabase.from('chat_likes').delete().eq('id', existing.id);
+    // Decrement count
+    const { data: msg } = await supabase
+      .from('chat_messages')
+      .select('likes_count')
+      .eq('id', messageId)
+      .single();
+    const newCount = Math.max((msg?.likes_count || 1) - 1, 0);
+    await supabase
+      .from('chat_messages')
+      .update({ likes_count: newCount })
+      .eq('id', messageId);
+    return { liked: false, newCount };
+  } else {
+    // Like
+    await supabase.from('chat_likes').insert([{ message_id: messageId, user_id: userId }]);
+    // Increment count
+    const { data: msg } = await supabase
+      .from('chat_messages')
+      .select('likes_count')
+      .eq('id', messageId)
+      .single();
+    const newCount = (msg?.likes_count || 0) + 1;
+    await supabase
+      .from('chat_messages')
+      .update({ likes_count: newCount })
+      .eq('id', messageId);
+    return { liked: true, newCount };
+  }
+}
+
+// Get user's liked message IDs for a room
+export async function getUserLikes(
+  roomId: string,
+  userId: string
+): Promise<Set<string>> {
+  const supabase = createClient();
+
+  const { data } = await supabase
+    .from('chat_likes')
+    .select('message_id, chat_messages!inner(room_id)')
+    .eq('user_id', userId)
+    .eq('chat_messages.room_id', roomId);
+
+  return new Set((data || []).map((d: any) => d.message_id));
+}
+
+// Get pinned messages for a room
+export async function getPinnedMessages(roomId: string): Promise<ChatMessage[]> {
+  const supabase = createClient();
+
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .eq('room_id', roomId)
+    .eq('is_pinned', true)
+    .order('likes_count', { ascending: false })
+    .limit(3);
+
+  if (error) throw error;
+  return data || [];
+}
+
+// Toggle pin a message (admin function)
+export async function togglePinMessage(messageId: string): Promise<boolean> {
+  const supabase = createClient();
+
+  const { data: msg } = await supabase
+    .from('chat_messages')
+    .select('is_pinned')
+    .eq('id', messageId)
+    .single();
+
+  const newPinned = !(msg?.is_pinned);
+  await supabase
+    .from('chat_messages')
+    .update({ is_pinned: newPinned })
+    .eq('id', messageId);
+
+  return newPinned;
+}

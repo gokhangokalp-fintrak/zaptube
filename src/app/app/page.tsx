@@ -1070,7 +1070,7 @@ export default function AppPage() {
         </div>
 
         {/* Right: Sidebar (hidden on mobile) */}
-        <div className="hidden lg:block w-80 shrink-0">
+        <div className="hidden lg:block w-96 shrink-0">
           <div className="sticky top-20 space-y-4">
             <ChatPanel />
             <SponsorSidebar />
