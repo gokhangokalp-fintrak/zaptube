@@ -1,29 +1,15 @@
 'use client';
 
-import { getTopScorers, TopScorer } from '@/lib/sports-data';
-import { useEffect, useState } from 'react';
+import { TopScorer } from '@/lib/sports-data';
+import { useSportsData } from '@/lib/use-sports-data';
 
 const MEDAL_EMOJIS = ['🥇', '🥈', '🥉'];
 
 export default function TopScorersWidget() {
-  const [scorers, setScorers] = useState<TopScorer[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchScorers = async () => {
-      try {
-        const data = await getTopScorers();
-        // Take top 10
-        setScorers(data.slice(0, 10));
-      } catch (error) {
-        console.error('Failed to fetch top scorers:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchScorers();
-  }, []);
+  const { data: allScorers, loading, isRealData } = useSportsData<TopScorer[]>({
+    type: 'scorers',
+  });
+  const scorers = (allScorers || []).slice(0, 10);
 
   if (loading) {
     return (

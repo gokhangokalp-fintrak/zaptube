@@ -1,7 +1,8 @@
 'use client';
 
-import { getFixtures, formatMatchDate, Match } from '@/lib/sports-data';
-import { useEffect, useState } from 'react';
+import { formatMatchDate, Match } from '@/lib/sports-data';
+import { useState } from 'react';
+import { useSportsData } from '@/lib/use-sports-data';
 
 interface GroupedMatches {
   [date: string]: Match[];
@@ -10,30 +11,17 @@ interface GroupedMatches {
 type TabType = 'upcoming' | 'finished';
 
 export default function FixturesWidget() {
-  const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: matches, loading } = useSportsData<Match[]>({
+    type: 'fixtures',
+  });
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const [expandedMatch, setExpandedMatch] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchMatches = async () => {
-      try {
-        const data = await getFixtures();
-        setMatches(data);
-      } catch (error) {
-        console.error('Failed to fetch fixtures:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMatches();
-  }, []);
-
+  const allMatches = matches || [];
   const now = new Date();
-  const upcomingMatches = matches.filter((m) => new Date(m.date) > now);
-  const finishedMatches = matches.filter((m) => m.status === 'finished');
-  const liveMatches = matches.filter((m) => m.status === 'live');
+  const upcomingMatches = allMatches.filter((m) => m.status === 'upcoming');
+  const finishedMatches = allMatches.filter((m) => m.status === 'finished');
+  const liveMatches = allMatches.filter((m) => m.status === 'live' || m.status === 'halftime');
 
   const displayMatches = activeTab === 'upcoming' ? upcomingMatches : finishedMatches;
   const grouped = displayMatches.reduce((acc, match) => {

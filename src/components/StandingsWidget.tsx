@@ -1,30 +1,16 @@
 'use client';
 
-import { getStandings, getFormColor, TeamStanding } from '@/lib/sports-data';
-import { useEffect, useState } from 'react';
+import { TeamStanding } from '@/lib/sports-data';
+import { useSportsData } from '@/lib/use-sports-data';
 
 interface StandingsWidgetProps {
   selectedTeamId?: string;
 }
 
 export default function StandingsWidget({ selectedTeamId }: StandingsWidgetProps) {
-  const [standings, setStandings] = useState<TeamStanding[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStandings = async () => {
-      try {
-        const data = await getStandings();
-        setStandings(data);
-      } catch (error) {
-        console.error('Failed to fetch standings:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStandings();
-  }, []);
+  const { data: standings, loading, isRealData } = useSportsData<TeamStanding[]>({
+    type: 'standings',
+  });
 
   const getLeftBorderColor = (position: number) => {
     if (position === 1) return 'border-l-4 border-l-yellow-400'; // Champions
@@ -49,7 +35,10 @@ export default function StandingsWidget({ selectedTeamId }: StandingsWidgetProps
       {/* Header */}
       <div className="mb-4">
         <h2 className="text-lg font-bold text-white mb-1">🏆 Puan Durumu</h2>
-        <p className="text-xs text-gray-400">Süper Lig 2025-26</p>
+        <p className="text-xs text-gray-400">
+          Süper Lig 2025-26
+          {isRealData && <span className="ml-2 text-green-400 text-[8px]">● CANLI</span>}
+        </p>
       </div>
 
       {/* Table */}
@@ -70,7 +59,7 @@ export default function StandingsWidget({ selectedTeamId }: StandingsWidgetProps
             </tr>
           </thead>
           <tbody>
-            {standings.map((team, index) => {
+            {(standings || []).map((team, index) => {
               const isSelected = selectedTeamId === team.shortName;
               const borderClass = getLeftBorderColor(index + 1);
 

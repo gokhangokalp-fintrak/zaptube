@@ -1,65 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useSportsData } from '@/lib/use-sports-data';
 
-// Simulated live match data (in production, you'd use a real API like api-football)
-const MOCK_MATCHES = [
-  {
-    id: '1',
-    league: 'Süper Lig',
-    home: { name: 'Galatasaray', emoji: '🦁', score: 2 },
-    away: { name: 'Fenerbahçe', emoji: '🐤', score: 1 },
-    minute: 67,
-    status: 'live' as const,
-    events: ['⚽ 23\' Icardi', '⚽ 45\' Dzeko', '⚽ 51\' Icardi'],
-  },
-  {
-    id: '2',
-    league: 'Süper Lig',
-    home: { name: 'Beşiktaş', emoji: '🦅', score: 0 },
-    away: { name: 'Trabzonspor', emoji: '⭐', score: 0 },
-    minute: 34,
-    status: 'live' as const,
-    events: [],
-  },
-  {
-    id: '3',
-    league: 'Süper Lig',
-    home: { name: 'Başakşehir', emoji: '🏟️', score: 3 },
-    away: { name: 'Antalyaspor', emoji: '🌴', score: 1 },
-    minute: 90,
-    status: 'finished' as const,
-    events: ['⚽ 12\' Crivelli', '⚽ 29\' Visca', '⚽ 44\' Crivelli', '⚽ 78\' Podolski'],
-  },
-  {
-    id: '4',
-    league: 'Süper Lig',
-    home: { name: 'Samsunspor', emoji: '🔴', score: null },
-    away: { name: 'Konyaspor', emoji: '🟢', score: null },
-    minute: 0,
-    status: 'upcoming' as const,
-    startTime: '21:00',
-    events: [],
-  },
-];
+interface LiveMatch {
+  id: number;
+  home: { name: string; shortName: string; logo?: string; score: number | null };
+  away: { name: string; shortName: string; logo?: string; score: number | null };
+  status: 'upcoming' | 'live' | 'halftime' | 'finished';
+  minute: number | null;
+  date: string;
+  stadium: string;
+  league: string;
+  events: { minute: number; type: string; player: string; team: string; detail?: string }[];
+}
 
 export default function LiveScoreWidget() {
-  const [matches, setMatches] = useState(MOCK_MATCHES);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { data: matches, loading, isRealData } = useSportsData<LiveMatch[]>({
+    type: 'live',
+    refreshInterval: 120000, // 2 dakikada bir yenile
+  });
 
-  // Simulate minute changes for live matches
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setMatches(prev => prev.map(m => {
-        if (m.status !== 'live') return m;
-        const newMinute = Math.min(m.minute + 1, 90);
-        return { ...m, minute: newMinute, status: newMinute >= 90 ? 'finished' as const : 'live' as const };
-      }));
-    }, 30000); // Every 30 sec = 1 game minute
-    return () => clearInterval(interval);
-  }, []);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
-  const liveCount = matches.filter(m => m.status === 'live').length;
+  const liveMatches = matches || [];
+  const liveCount = liveMatches.filter(m => m.status === 'live' || m.status === 'halftime').length;
 
   return (
     <div className="bg-[#1a1a2e] rounded-xl border border-white/10 overflow-hidden">
@@ -68,85 +33,102 @@ export default function LiveScoreWidget() {
         <div className="flex items-center gap-2">
           <span className="text-lg">⚽</span>
           <h3 className="text-sm font-bold text-white">Canlı Skorlar</h3>
+          {isRealData && (
+            <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-bold">CANLI</span>
+          )}
         </div>
         {liveCount > 0 && (
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-[10px] text-red-400 font-bold">{liveCount} CANLI MAÇ</span>
+            <span className="text-[10px] text-red-400 font-bold">{liveCount} MAÇ</span>
           </div>
         )}
       </div>
 
-      {/* Matches */}
-      <div className="divide-y divide-white/5">
-        {matches.map(match => (
-          <button
-            key={match.id}
-            onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
-            className="w-full text-left px-4 py-3 hover:bg-white/[0.03] transition-colors"
-          >
-            {/* League & Status */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] text-gray-500">{match.league}</span>
-              {match.status === 'live' && (
-                <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                  {match.minute}&#39;
-                </span>
-              )}
-              {match.status === 'finished' && (
-                <span className="text-[10px] text-gray-500">MS</span>
-              )}
-              {match.status === 'upcoming' && (
-                <span className="text-[10px] text-yellow-400">{match.startTime}</span>
-              )}
-            </div>
-
-            {/* Score */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="text-sm">{match.home.emoji}</span>
-                <span className="text-xs text-white font-medium truncate">{match.home.name}</span>
-              </div>
-
-              <div className="flex items-center gap-2 px-3 shrink-0">
-                {match.status === 'upcoming' ? (
-                  <span className="text-xs text-gray-500">vs</span>
-                ) : (
-                  <>
-                    <span className={`text-lg font-black ${match.status === 'live' ? 'text-white' : 'text-gray-400'}`}>
-                      {match.home.score}
-                    </span>
-                    <span className="text-gray-600 text-xs">-</span>
-                    <span className={`text-lg font-black ${match.status === 'live' ? 'text-white' : 'text-gray-400'}`}>
-                      {match.away.score}
-                    </span>
-                  </>
+      {/* Content */}
+      {loading ? (
+        <div className="p-6 text-center">
+          <div className="text-gray-500 text-xs animate-pulse">Yükleniyor...</div>
+        </div>
+      ) : liveMatches.length === 0 ? (
+        <div className="p-6 text-center">
+          <div className="text-2xl mb-2 opacity-40">📡</div>
+          <p className="text-xs text-gray-500">Şu an canlı maç yok</p>
+          <p className="text-[10px] text-gray-600 mt-1">Maç günü skorlar burada görünecek</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-white/5">
+          {liveMatches.map(match => (
+            <button
+              key={match.id}
+              onClick={() => setExpandedId(expandedId === match.id ? null : match.id)}
+              className="w-full text-left px-4 py-3 hover:bg-white/[0.03] transition-colors"
+            >
+              {/* Status */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] text-gray-500">{match.league}</span>
+                {(match.status === 'live' || match.status === 'halftime') && (
+                  <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    {match.status === 'halftime' ? 'D.Arası' : `${match.minute}'`}
+                  </span>
+                )}
+                {match.status === 'finished' && (
+                  <span className="text-[10px] text-gray-500">MS</span>
                 )}
               </div>
 
-              <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-                <span className="text-xs text-white font-medium truncate">{match.away.name}</span>
-                <span className="text-sm">{match.away.emoji}</span>
-              </div>
-            </div>
+              {/* Score */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {match.home.logo && (
+                    <img src={match.home.logo} alt="" className="w-5 h-5 object-contain" />
+                  )}
+                  <span className="text-xs text-white font-medium truncate">{match.home.shortName || match.home.name}</span>
+                </div>
 
-            {/* Expanded Events */}
-            {expandedId === match.id && match.events.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-white/5">
-                {match.events.map((event, idx) => (
-                  <p key={idx} className="text-[10px] text-gray-400 py-0.5">{event}</p>
-                ))}
+                <div className="flex items-center gap-2 px-3 shrink-0">
+                  <span className={`text-lg font-black ${match.status === 'live' ? 'text-white' : 'text-gray-400'}`}>
+                    {match.home.score ?? '-'}
+                  </span>
+                  <span className="text-gray-600 text-xs">-</span>
+                  <span className={`text-lg font-black ${match.status === 'live' ? 'text-white' : 'text-gray-400'}`}>
+                    {match.away.score ?? '-'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                  <span className="text-xs text-white font-medium truncate">{match.away.shortName || match.away.name}</span>
+                  {match.away.logo && (
+                    <img src={match.away.logo} alt="" className="w-5 h-5 object-contain" />
+                  )}
+                </div>
               </div>
-            )}
-          </button>
-        ))}
-      </div>
+
+              {/* Expanded Events */}
+              {expandedId === match.id && match.events && match.events.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-white/5">
+                  {match.events
+                    .filter(e => e.type === 'goal' || e.type === 'penalty' || e.type === 'own_goal')
+                    .map((event, idx) => (
+                    <p key={idx} className="text-[10px] text-gray-400 py-0.5">
+                      {event.type === 'goal' && '⚽'}
+                      {event.type === 'penalty' && '⚽🅿️'}
+                      {event.type === 'own_goal' && '⚽🔴'}
+                      {' '}{event.minute}&apos; {event.player}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="px-4 py-2 border-t border-white/10 bg-white/[0.02]">
         <p className="text-[10px] text-gray-600 text-center">
-          Veriler simülasyon amaçlıdır
+          {isRealData ? 'API-Football · Her 2 dk güncellenir' : 'Maç günü canlı skorlar burada'}
         </p>
       </div>
     </div>
