@@ -47,9 +47,11 @@ async function getL2Cache(key: string): Promise<Video[] | null> {
     const { data, error } = await supabase.rpc('get_video_cache', { p_key: key });
 
     if (error || !data) return null;
-    return data as Video[];
+    // Data might be a JSON string (double-stringify issue) or already parsed
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    return Array.isArray(parsed) ? parsed : null;
   } catch {
-    // Supabase down? No problem, fall through to YouTube API
+    // Supabase down or parse error? Fall through to YouTube API
     return null;
   }
 }
@@ -59,7 +61,7 @@ async function setL2Cache(key: string, videos: Video[], ttlHours: number = 2): P
     const supabase = createClient();
     await supabase.rpc('set_video_cache', {
       p_key: key,
-      p_data: JSON.stringify(videos),
+      p_data: videos,
       p_ttl_hours: ttlHours,
     });
   } catch {
@@ -339,9 +341,11 @@ export async function getChannelStats(
     const supabase = createClient();
     const { data: l2Data } = await supabase.rpc('get_video_cache', { p_key: cacheKey });
     if (l2Data) {
-      const stats = l2Data as ChannelStats[];
-      statsCache.set(cacheKey, { data: stats, timestamp: Date.now() });
-      return stats;
+      const parsed = typeof l2Data === 'string' ? JSON.parse(l2Data) : l2Data;
+      if (Array.isArray(parsed)) {
+        statsCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
+        return parsed;
+      }
     }
   } catch {
     // Supabase down, continue to API
