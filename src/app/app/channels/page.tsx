@@ -21,12 +21,18 @@ export default function ChannelsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Get user
+  // Get user with auth state listener
   useEffect(() => {
     const supabase = createClient();
+    // First try getUser
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
     });
+    // Also listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   // Load preferences
@@ -67,27 +73,43 @@ export default function ChannelsPage() {
   };
 
   const handleFollow = async (channelId: string) => {
-    if (!user) return;
+    if (!user) {
+      showToast('Takip etmek için giriş yapmalısın');
+      return;
+    }
     setActionLoading(channelId + '-follow');
-    const result = await toggleFollow(user.id, channelId);
-    if (result.success) {
-      const updated = await getUserPreferences(user.id);
-      setPrefs(updated);
-    } else if (result.error) {
-      showToast(result.error);
+    try {
+      const result = await toggleFollow(user.id, channelId);
+      if (result.success) {
+        const updated = await getUserPreferences(user.id);
+        setPrefs(updated);
+        showToast(result.isFollowing ? '✓ Takip edildi!' : 'Takip bırakıldı');
+      } else if (result.error) {
+        showToast(result.error);
+      }
+    } catch (err: any) {
+      showToast('Hata: ' + (err?.message || 'Bir sorun oluştu'));
     }
     setActionLoading(null);
   };
 
   const handleFavorite = async (channelId: string) => {
-    if (!user) return;
+    if (!user) {
+      showToast('Favorilere eklemek için giriş yapmalısın');
+      return;
+    }
     setActionLoading(channelId + '-fav');
-    const result = await toggleFavorite(user.id, channelId);
-    if (result.success) {
-      const updated = await getUserPreferences(user.id);
-      setPrefs(updated);
-    } else if (result.error) {
-      showToast(result.error);
+    try {
+      const result = await toggleFavorite(user.id, channelId);
+      if (result.success) {
+        const updated = await getUserPreferences(user.id);
+        setPrefs(updated);
+        showToast(result.isFavorite ? '★ Favorilere eklendi!' : 'Favorilerden çıkarıldı');
+      } else if (result.error) {
+        showToast(result.error);
+      }
+    } catch (err: any) {
+      showToast('Hata: ' + (err?.message || 'Bir sorun oluştu'));
     }
     setActionLoading(null);
   };
@@ -96,7 +118,7 @@ export default function ChannelsPage() {
     <main className="min-h-screen">
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 z-[200] bg-red-500/90 text-white text-sm px-4 py-2.5 rounded-xl shadow-xl animate-slide-up">
+        <div className={`fixed top-4 right-4 z-[200] text-white text-sm px-4 py-2.5 rounded-xl shadow-xl ${toast.startsWith('✓') || toast.startsWith('★') ? 'bg-emerald-500/90' : toast.startsWith('Hata') ? 'bg-red-500/90' : 'bg-orange-500/90'}`}>
           {toast}
         </div>
       )}

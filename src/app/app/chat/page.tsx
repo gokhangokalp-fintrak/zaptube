@@ -62,6 +62,11 @@ export default function ChatPage() {
 
         setUser(authUser);
 
+        // Listen for auth changes
+        supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) setUser(session.user);
+        });
+
         // Load chat rooms
         const roomsList = await getChatRooms();
         setRooms(roomsList);

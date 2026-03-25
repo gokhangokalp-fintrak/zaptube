@@ -91,11 +91,19 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
           const roomsList = await getChatRooms();
           setRooms(roomsList);
           if (roomsList.length > 0) {
-            setSelectedRoom(roomsList[0]);
-            await loadMessages(roomsList[0].id);
-            await loadPinnedMessages(roomsList[0].id);
+            const generalRoom = roomsList.find((r) => r.type === 'general') || roomsList[0];
+            setSelectedRoom(generalRoom);
+            await loadMessages(generalRoom.id);
+            await loadPinnedMessages(generalRoom.id);
           }
         }
+        // Also listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) {
+            setUser(session.user);
+          }
+        });
+        return () => subscription.unsubscribe();
       } catch (err) {
         console.error('Chat init error:', err);
       } finally {
@@ -200,11 +208,21 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   }, [selectedRoom, user]);
 
   // Handle room change
+  const [roomLoading, setRoomLoading] = useState(false);
   const handleSelectRoom = async (room: ChatRoom) => {
+    if (selectedRoom?.id === room.id) return;
+    setRoomLoading(true);
     setSelectedRoom(room);
     setMessages([]);
-    await loadMessages(room.id);
-    await loadPinnedMessages(room.id);
+    setPinnedMessages([]);
+    try {
+      await loadMessages(room.id);
+      await loadPinnedMessages(room.id);
+    } catch (err) {
+      console.error('Room switch error:', err);
+    } finally {
+      setRoomLoading(false);
+    }
   };
 
   // Anti-spam + send message
@@ -316,14 +334,15 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
           <div className="relative">
             <button onClick={() => setShowMenu(!showMenu)} className="text-gray-400 hover:text-white transition-colors text-lg px-1">•••</button>
             {showMenu && (
-              <div className="absolute right-0 top-8 bg-[#0f0f23] border border-white/10 rounded-lg shadow-xl z-50 w-40 py-1">
+              <div className="absolute right-0 top-8 bg-[#0f0f23] border border-white/10 rounded-lg shadow-xl z-50 w-48 py-1 max-h-60 overflow-y-auto">
+                <div className="px-3 py-1 text-[10px] text-gray-500 uppercase font-bold">Oda Seç</div>
                 {rooms.map(room => (
                   <button
                     key={room.id}
                     onClick={() => { handleSelectRoom(room); setShowMenu(false); }}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors ${selectedRoom?.id === room.id ? 'text-red-400 bg-white/5' : 'text-gray-300 hover:bg-white/5'}`}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors ${selectedRoom?.id === room.id ? 'text-red-400 bg-white/5 font-bold' : 'text-gray-300 hover:bg-white/10'}`}
                   >
-                    {room.emoji} {room.name}
+                    {selectedRoom?.id === room.id && '● '}{room.emoji} {room.name}
                   </button>
                 ))}
               </div>
@@ -363,6 +382,12 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
 
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1" style={{ scrollBehavior: 'smooth' }}>
+        {roomLoading && (
+          <div className="flex items-center justify-center py-4">
+            <div className="animate-spin text-red-400 text-lg mr-2">↻</div>
+            <span className="text-gray-400 text-xs">Oda yükleniyor...</span>
+          </div>
+        )}
         {/* Pinned messages */}
         {pinnedMessages.length > 0 && (
           <div className="mb-2">
