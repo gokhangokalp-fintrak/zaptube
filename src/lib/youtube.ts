@@ -3,28 +3,155 @@ import { Video, ChannelStats } from '@/types';
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
 // =============================================
-// IN-MEMORY CACHE — Prevents excessive API calls
-// Cache expires after 10 minutes
+// MULTI-LEVEL CACHE SYSTEM
+// DiziKolik-style: Aggressive caching to prevent quota burn
 // =============================================
-const cache = new Map<string, { data: Video[]; timestamp: number }>();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 
+// Level 1: In-memory cache (instant, survives within session)
+const videoCache = new Map<string, { data: Video[]; timestamp: number }>();
+const VIDEO_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 HOURS (was 10 min!)
+
+// Level 2: Uploads playlist ID cache (UC→UU conversion, NO API call needed!)
+const uploadsPlaylistCache = new Map<string, string>();
+
+// Level 3: Channel stats cache
+const statsCache = new Map<string, { data: ChannelStats[]; timestamp: number }>();
+const STATS_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours for stats
+
+// =============================================
+// CACHE HELPERS
+// =============================================
 function getCached(key: string): Video[] | null {
-  const entry = cache.get(key);
+  const entry = videoCache.get(key);
   if (!entry) return null;
-  if (Date.now() - entry.timestamp > CACHE_TTL) {
-    cache.delete(key);
+  if (Date.now() - entry.timestamp > VIDEO_CACHE_TTL) {
+    videoCache.delete(key);
     return null;
   }
   return entry.data;
 }
 
 function setCache(key: string, data: Video[]): void {
-  cache.set(key, { data, timestamp: Date.now() });
+  videoCache.set(key, { data, timestamp: Date.now() });
 }
 
 // =============================================
-// API FUNCTIONS
+// ⚡ SMART PLAYLIST DERIVATION — NO API CALL!
+// YouTube rule: uploads playlist = "UU" + channelId.substring(2)
+// This saves 1 API credit per channel every time!
+// =============================================
+function getUploadsPlaylistId(channelId: string): string {
+  if (uploadsPlaylistCache.has(channelId)) {
+    return uploadsPlaylistCache.get(channelId)!;
+  }
+
+  // UC... → UU... conversion (YouTube's built-in format rule)
+  const playlistId = channelId.startsWith('UC')
+    ? 'UU' + channelId.substring(2)
+    : channelId;
+
+  uploadsPlaylistCache.set(channelId, playlistId);
+  return playlistId;
+}
+
+// =============================================
+// ⚡ QUOTA-EFFICIENT: Use playlistItems instead of search!
+// search.list = 100 units per call
+// playlistItems.list = 1 unit per call (100x cheaper!)
+// =============================================
+async function fetchChannelUploads(
+  channelId: string,
+  apiKey: string,
+  maxResults: number = 6
+): Promise<Video[]> {
+  const cacheKey = `uploads:${channelId}:${maxResults}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+
+  try {
+    // Step 1: Get uploads playlist ID (NO API call — just string conversion!)
+    const playlistId = getUploadsPlaylistId(channelId);
+
+    // Step 2: Fetch playlist items (1 unit instead of 100!)
+    const playlistRes = await fetch(
+      `${YOUTUBE_API_BASE}/playlistItems?` +
+        new URLSearchParams({
+          part: 'snippet,status',
+          playlistId,
+          maxResults: maxResults.toString(),
+          key: apiKey,
+        })
+    );
+
+    if (!playlistRes.ok) {
+      console.error(`PlaylistItems failed for ${channelId}:`, playlistRes.status);
+      return [];
+    }
+
+    const playlistData = await playlistRes.json();
+    const items = playlistData.items || [];
+
+    if (items.length === 0) return [];
+
+    // Step 3: Get video details for statistics + live info
+    // Batch all IDs into ONE call (saves quota!)
+    const videoIds = items
+      .map((item: any) => item.snippet?.resourceId?.videoId)
+      .filter(Boolean)
+      .join(',');
+
+    if (!videoIds) return [];
+
+    const detailsRes = await fetch(
+      `${YOUTUBE_API_BASE}/videos?` +
+        new URLSearchParams({
+          part: 'snippet,statistics,contentDetails,liveStreamingDetails',
+          id: videoIds,
+          key: apiKey,
+        })
+    );
+
+    if (!detailsRes.ok) {
+      console.error('Video details failed:', detailsRes.status);
+      return [];
+    }
+
+    const detailsData = await detailsRes.json();
+
+    const videos: Video[] = (detailsData.items || []).map((item: any) => {
+      const isLive = item.snippet?.liveBroadcastContent === 'live';
+      return {
+        id: item.id,
+        title: item.snippet.title,
+        channelTitle: item.snippet.channelTitle,
+        channelId: item.snippet.channelId,
+        thumbnail:
+          item.snippet.thumbnails?.high?.url ||
+          item.snippet.thumbnails?.medium?.url ||
+          '',
+        publishedAt: item.snippet.publishedAt,
+        viewCount: isLive
+          ? item.liveStreamingDetails?.concurrentViewers || item.statistics?.viewCount
+          : item.statistics?.viewCount,
+        duration: isLive ? 'CANLI' : parseDuration(item.contentDetails?.duration),
+        url: `https://www.youtube.com/watch?v=${item.id}`,
+        ytVideoId: item.id,
+        live: isLive,
+      };
+    });
+
+    // Cache for 2 hours!
+    setCache(cacheKey, videos);
+    return videos;
+  } catch (error) {
+    console.error('fetchChannelUploads error:', error);
+    return [];
+  }
+}
+
+// =============================================
+// FALLBACK: Original search method (expensive! 100 units)
+// Only used if playlist method fails
 // =============================================
 export async function searchChannelVideos(
   channelId: string,
@@ -32,7 +159,13 @@ export async function searchChannelVideos(
   maxResults: number = 6,
   query?: string
 ): Promise<Video[]> {
-  const cacheKey = `channel:${channelId}:${maxResults}:${query || ''}`;
+  // If no search query, use the cheap playlist method!
+  if (!query) {
+    return fetchChannelUploads(channelId, apiKey, maxResults);
+  }
+
+  // Search is only used when user explicitly searches (rare)
+  const cacheKey = `search:${channelId}:${maxResults}:${query}`;
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
@@ -61,7 +194,6 @@ export async function searchChannelVideos(
 
     if (!videoIds) return [];
 
-    // Get video details for view counts and duration
     const detailsRes = await fetch(
       `${YOUTUBE_API_BASE}/videos?part=snippet,statistics,contentDetails,liveStreamingDetails&id=${videoIds}&key=${apiKey}`
     );
@@ -74,7 +206,10 @@ export async function searchChannelVideos(
         title: item.snippet.title,
         channelTitle: item.snippet.channelTitle,
         channelId: item.snippet.channelId,
-        thumbnail: item.snippet.thumbnails?.high?.url || item.snippet.thumbnails?.medium?.url || '',
+        thumbnail:
+          item.snippet.thumbnails?.high?.url ||
+          item.snippet.thumbnails?.medium?.url ||
+          '',
         publishedAt: item.snippet.publishedAt,
         viewCount: isLive
           ? item.liveStreamingDetails?.concurrentViewers || item.statistics?.viewCount
@@ -89,11 +224,14 @@ export async function searchChannelVideos(
     setCache(cacheKey, videos);
     return videos;
   } catch (error) {
-    console.error('YouTube API error:', error);
+    console.error('YouTube API search error:', error);
     return [];
   }
 }
 
+// =============================================
+// MULTI-CHANNEL: Parallel fetch with smart caching
+// =============================================
 export async function getMultiChannelVideos(
   channelIds: string[],
   apiKey: string,
@@ -103,30 +241,36 @@ export async function getMultiChannelVideos(
   const cached = getCached(cacheKey);
   if (cached) return cached;
 
-  const allVideos = await Promise.all(
-    channelIds.map((id) => searchChannelVideos(id, apiKey, maxPerChannel))
+  // Use Promise.allSettled to prevent cascade failures
+  const results = await Promise.allSettled(
+    channelIds.map((id) => fetchChannelUploads(id, apiKey, maxPerChannel))
   );
 
-  const result = allVideos
-    .flat()
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  const allVideos: Video[] = [];
+  results.forEach((result) => {
+    if (result.status === 'fulfilled') {
+      allVideos.push(...result.value);
+    }
+  });
 
-  setCache(cacheKey, result);
-  return result;
+  const sorted = allVideos.sort(
+    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+  );
+
+  setCache(cacheKey, sorted);
+  return sorted;
 }
 
 // =============================================
-// CHANNEL STATISTICS
+// CHANNEL STATISTICS (batched, cached 4 hours)
 // =============================================
-const statsCache = new Map<string, { data: ChannelStats[]; timestamp: number }>();
-
 export async function getChannelStats(
   channelIds: string[],
   apiKey: string
 ): Promise<ChannelStats[]> {
   const cacheKey = `stats:${channelIds.sort().join(',')}`;
   const cached = statsCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+  if (cached && Date.now() - cached.timestamp < STATS_CACHE_TTL) {
     return cached.data;
   }
 
@@ -142,7 +286,10 @@ export async function getChannelStats(
       channelId: item.id,
       title: item.snippet.title,
       description: item.snippet.description,
-      thumbnail: item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '',
+      thumbnail:
+        item.snippet.thumbnails?.medium?.url ||
+        item.snippet.thumbnails?.default?.url ||
+        '',
       subscriberCount: item.statistics.subscriberCount || '0',
       viewCount: item.statistics.viewCount || '0',
       videoCount: item.statistics.videoCount || '0',
@@ -157,6 +304,9 @@ export async function getChannelStats(
   }
 }
 
+// =============================================
+// HELPERS
+// =============================================
 function parseDuration(isoDuration?: string): string {
   if (!isoDuration) return '';
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
