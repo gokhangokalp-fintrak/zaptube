@@ -1,0 +1,97 @@
+{
+  "channels": [
+    {
+      "id": "erman-toroglu",
+      "name": "Erman Toroğlu",
+      "youtubeChannelId": "UCxQzS8ZbwOz2ePqnkSxBbSA",
+      "description": "Türk futbolunun efsane yorumcusu. Sert ve dobra yorumlarıyla tanınır.",
+      "thumbnail": "/images/channels/erman.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["sert-yorum", "analiz"],
+      "tags": ["efsane", "sert", "dobra"],
+      "priority": 1
+    },
+    {
+      "id": "ugur-karakullukcu",
+      "name": "Uğur Karakullukçu",
+      "youtubeChannelId": "UCGzx8pA0gMKhPSKiVP8sFOA",
+      "description": "Taktik analiz uzmanı. Maçları derinlemesine analiz eder.",
+      "thumbnail": "/images/channels/ugur.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["analiz", "taktik"],
+      "tags": ["taktik", "analiz", "detaylı"],
+      "priority": 2
+    },
+    {
+      "id": "serdar-ali-celikler",
+      "name": "Serdar Ali Çelikler",
+      "youtubeChannelId": "UC1H2J4fMg6CNqNLfKN5DXHQ",
+      "description": "Galatasaray ağırlıklı yorumlar. Eğlenceli ve samimi tarzıyla bilinir.",
+      "thumbnail": "/images/channels/serdar.jpg",
+      "teams": ["gs", "genel"],
+      "contentTypes": ["yorum", "eglence", "canli-yayin"],
+      "tags": ["gs", "samimi", "eğlenceli"],
+      "priority": 1
+    },
+    {
+      "id": "ali-ece",
+      "name": "Ali Ece",
+      "youtubeChannelId": "UCbJmx9-ITJYCqmHCHpMKPfg",
+      "description": "Deneyimli spor muhabiri. Dengeli ve bilgi dolu yorumlar.",
+      "thumbnail": "/images/channels/ali-ece.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["analiz", "yorum", "ozet"],
+      "tags": ["dengeli", "bilgili", "muhabir"],
+      "priority": 2
+    },
+    {
+      "id": "sinan-engin",
+      "name": "Sinan Engin",
+      "youtubeChannelId": "UCexample-sinan",
+      "description": "Beşiktaş efsanesi. Sert yorumları ve net tavrıyla tanınır.",
+      "thumbnail": "/images/channels/sinan.jpg",
+      "teams": ["bjk", "genel"],
+      "contentTypes": ["sert-yorum", "yorum", "canli-yayin"],
+      "tags": ["bjk", "sert", "efsane"],
+      "priority": 2
+    },
+    {
+      "id": "fenerbahce-youtube",
+      "name": "FB TV / Fener Yorumcuları",
+      "youtubeChannelId": "UCexample-fbtv",
+      "description": "Fenerbahçe odaklı içerikler. Maç özetleri ve yorumlar.",
+      "thumbnail": "/images/channels/fbtv.jpg",
+      "teams": ["fb"],
+      "contentTypes": ["ozet", "yorum", "canli-yayin"],
+      "tags": ["fb", "özet", "yorum"],
+      "priority": 1
+    },
+    {
+      "id": "trabzonspor-medya",
+      "name": "TS Medya",
+      "youtubeChannelId": "UCexample-tsmedya",
+      "description": "Trabzonspor odaklı içerikler ve yorumlar.",
+      "thumbnail": "/images/channels/ts.jpg",
+      "teams": ["ts"],
+      "contentTypes": ["yorum", "ozet", "canli-yayin"],
+      "tags": ["ts", "karadeniz", "yorum"],
+      "priority": 2
+    }
+  ],
+  "teams": [
+    { "id": "genel", "name": "Tüm Takımlar", "emoji": "⚽", "color": "#10B981" },
+    { "id": "gs", "name": "Galatasaray", "emoji": "🦁", "color": "#C8102E" },
+    { "id": "fb", "name": "Fenerbahçe", "emoji": "🐤", "color": "#003DA5" },
+    { "id": "bjk", "name": "Beşiktaş", "emoji": "🦅", "color": "#000000" },
+    { "id": "ts", "name": "Trabzonspor", "emoji": "⭐", "color": "#6B0D0D" }
+  ],
+  "contentTypes": [
+    { "id": "ozet", "name": "Maç Özeti", "emoji": "🎬", "description": "Maç özetleri ve goller" },
+    { "id": "analiz", "name": "Taktik Analiz", "emoji": "📊", "description": "Detaylı taktik ve teknik analizler" },
+    { "id": "yorum", "name": "Yorum/Değerlendirme", "emoji": "🎙️", "description": "Maç sonrası yorumlar" },
+    { "id": "sert-yorum", "name": "Sert Yorum", "emoji": "🔥", "description": "Dobra ve sert eleştiriler" },
+    { "id": "eglence", "name": "Caps / Eğlence", "emoji": "😂", "description": "Eğlenceli içerikler ve capsler" },
+    { "id": "canli-yayin", "name": "Canlı Yayın", "emoji": "🔴", "description": "Canlı yayınlar ve sohbetler" },
+    { "id": "taktik", "name": "Taktik Board", "emoji": "📋", "description": "Taktik tahta analizleri" }
+  ]
+}
