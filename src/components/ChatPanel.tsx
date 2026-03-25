@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
-import { getChatRooms, getMessages, sendMessage, toggleLike, getPinnedMessages } from '@/lib/chat';
-import type { ChatRoom, ChatMessage } from '@/types';
+import { getChatRooms, getMessages, sendMessage, toggleLike, getPinnedMessages, toggleReaction, getReactionCounts } from '@/lib/chat';
+import type { ChatRoom, ChatMessage, ReactionCount } from '@/types';
+import { addXp, XP_ACTIONS, awardBadge } from '@/lib/gamification';
 
 // Fake messages for initial activity
 const FAKE_MESSAGES = [
@@ -36,6 +37,8 @@ function sortRooms(rooms: ChatRoom[]): ChatRoom[] {
   return [...rooms].sort((a, b) => (order[a.type] ?? 3) - (order[b.type] ?? 3));
 }
 
+const MESSAGE_REACTIONS = ['⚽', '🔥', '😂', '😡', '👏', '💀'];
+
 interface ExtendedMessage extends ChatMessage {
   likes_count?: number;
   is_pinned?: boolean;
@@ -43,6 +46,7 @@ interface ExtendedMessage extends ChatMessage {
   fakeLikes?: number;
   fakeUser?: string;
   fakeAvatar?: string;
+  reactionCounts?: ReactionCount[];
 }
 
 export default function ChatPanel({ onClose }: { onClose?: () => void }) {
@@ -61,6 +65,10 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   const [spamWarning, setSpamWarning] = useState('');
   const [onlineCount, setOnlineCount] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
+  const [reactionPickerMsgId, setReactionPickerMsgId] = useState<string | null>(null);
+  const [messageReactions, setMessageReactions] = useState<Record<string, ReactionCount[]>>({});
+  const [xpToast, setXpToast] = useState<string | null>(null);
+  const [msgCount, setMsgCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const subscriptionRef = useRef<any>(null);
@@ -138,6 +146,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     try {
       const msgs = await getMessages(roomId, 50);
       setMessages(msgs);
+      loadReactions(msgs);
     } catch (err) {
       console.error('Load messages error:', err);
     }
@@ -279,6 +288,22 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       if (!content) setMessageInput('');
       setLastSendTime(now);
       setLastMessage(text);
+
+      // XP for sending message
+      const newCount = msgCount + 1;
+      setMsgCount(newCount);
+      try {
+        await addXp(user.id, XP_ACTIONS.SEND_MESSAGE.action, XP_ACTIONS.SEND_MESSAGE.amount);
+        showXpToast('+5 XP');
+        // Badge checks
+        if (newCount === 1) await awardBadge(user.id, 'first_message');
+        if (newCount === 50) await awardBadge(user.id, 'msg_50');
+        if (newCount === 100) await awardBadge(user.id, 'msg_100');
+        // Night owl / early bird badges
+        const hour = new Date().getHours();
+        if (hour >= 2 && hour < 5) await awardBadge(user.id, 'night_owl');
+        if (hour >= 5 && hour < 7) await awardBadge(user.id, 'early_bird');
+      } catch (e) { /* XP non-critical */ }
     } catch (err) {
       console.error('Send error:', err);
     } finally {
@@ -309,6 +334,53 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     } catch (err) {
       console.error('Like error:', err);
     }
+  };
+
+  // Handle emoji reaction on message
+  const handleReaction = async (msgId: string, emoji: string) => {
+    if (!user || msgId.startsWith('fake')) return;
+    try {
+      const result = await toggleReaction(msgId, user.id, emoji);
+      // Update local reaction state
+      setMessageReactions(prev => {
+        const current = prev[msgId] || [];
+        const existing = current.find(r => r.emoji === emoji);
+        if (result.added) {
+          if (existing) {
+            return { ...prev, [msgId]: current.map(r => r.emoji === emoji ? { ...r, count: r.count + 1, user_reacted: true } : r) };
+          } else {
+            return { ...prev, [msgId]: [...current, { emoji, count: 1, user_reacted: true }] };
+          }
+        } else {
+          if (existing && existing.count <= 1) {
+            return { ...prev, [msgId]: current.filter(r => r.emoji !== emoji) };
+          }
+          return { ...prev, [msgId]: current.map(r => r.emoji === emoji ? { ...r, count: r.count - 1, user_reacted: false } : r) };
+        }
+      });
+      setReactionPickerMsgId(null);
+    } catch (err) {
+      console.error('Reaction error:', err);
+    }
+  };
+
+  // Load reactions for visible messages
+  const loadReactions = async (msgs: ExtendedMessage[]) => {
+    if (!user) return;
+    const realMsgIds = msgs.filter(m => !m.isFake).map(m => m.id);
+    if (realMsgIds.length === 0) return;
+    try {
+      const counts = await getReactionCounts(realMsgIds, user.id);
+      setMessageReactions(prev => ({ ...prev, ...counts }));
+    } catch (err) {
+      console.error('Load reactions error:', err);
+    }
+  };
+
+  // Show XP toast
+  const showXpToast = (text: string) => {
+    setXpToast(text);
+    setTimeout(() => setXpToast(null), 2000);
   };
 
   const formatTime = (dateStr: string): string => {
@@ -497,40 +569,90 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         )}
 
         {/* Regular messages */}
-        {messages.map(msg => (
-          <div key={msg.id} className="flex items-start gap-2 py-1 group hover:bg-white/5 rounded px-1 transition-colors">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${getAvatarColor(msg.user_name)}`}>
-              {msg.user_avatar || msg.user_name.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className="font-bold text-sm" style={{ color: msg.isFake ? '#f59e0b' : '#ef4444' }}>
-                {msg.user_name}
-              </span>
-              <span className="text-gray-500 text-xs ml-2">{formatTime(msg.created_at)}</span>
-              <p className="text-gray-200 text-sm break-words">{msg.content}</p>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {!msg.isFake ? (
-                <button
-                  onClick={() => handleLike(msg.id)}
-                  className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded transition-all ${
-                    userLikes.has(msg.id) ? 'text-red-400' : 'text-gray-600 opacity-0 group-hover:opacity-100'
-                  }`}
-                >
-                  <span className="text-xs">❤️</span>
-                  {(msg.likes_count || 0) > 0 && (
-                    <span className="text-xs font-bold text-red-400">{msg.likes_count}</span>
+        {messages.map(msg => {
+          const reactions = messageReactions[msg.id] || [];
+          return (
+            <div key={msg.id} className="py-1 group hover:bg-white/5 rounded px-1 transition-colors relative">
+              <div className="flex items-start gap-2">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ${getAvatarColor(msg.user_name)}`}>
+                  {msg.user_avatar || msg.user_name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="font-bold text-sm" style={{ color: msg.isFake ? '#f59e0b' : '#ef4444' }}>
+                    {msg.user_name}
+                  </span>
+                  <span className="text-gray-500 text-xs ml-2">{formatTime(msg.created_at)}</span>
+                  <p className="text-gray-200 text-sm break-words">{msg.content}</p>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {!msg.isFake ? (
+                    <>
+                      {/* Reaction trigger */}
+                      <button
+                        onClick={() => setReactionPickerMsgId(reactionPickerMsgId === msg.id ? null : msg.id)}
+                        className="text-gray-600 opacity-0 group-hover:opacity-100 hover:text-white text-xs px-1 transition-all"
+                        title="Emoji ekle"
+                      >
+                        😊
+                      </button>
+                      <button
+                        onClick={() => handleLike(msg.id)}
+                        className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded transition-all ${
+                          userLikes.has(msg.id) ? 'text-red-400' : 'text-gray-600 opacity-0 group-hover:opacity-100'
+                        }`}
+                      >
+                        <span className="text-xs">❤️</span>
+                        {(msg.likes_count || 0) > 0 && (
+                          <span className="text-xs font-bold text-red-400">{msg.likes_count}</span>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-0.5 px-1.5">
+                      <span className="text-xs">❤️</span>
+                      <span className="text-xs font-bold text-red-400">{msg.fakeLikes}</span>
+                    </div>
                   )}
-                </button>
-              ) : (
-                <div className="flex items-center gap-0.5 px-1.5">
-                  <span className="text-xs">❤️</span>
-                  <span className="text-xs font-bold text-red-400">{msg.fakeLikes}</span>
+                </div>
+              </div>
+
+              {/* Reaction picker popup */}
+              {reactionPickerMsgId === msg.id && !msg.isFake && (
+                <div className="absolute right-0 top-0 flex items-center gap-0.5 bg-[#0f0f23] border border-white/10 rounded-full px-1.5 py-0.5 shadow-xl z-50">
+                  {MESSAGE_REACTIONS.map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={() => handleReaction(msg.id, emoji)}
+                      className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center text-sm transition-all hover:scale-125 active:scale-90"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Existing reactions display */}
+              {reactions.length > 0 && (
+                <div className="flex items-center gap-1 ml-9 mt-0.5 flex-wrap">
+                  {reactions.map(r => (
+                    <button
+                      key={r.emoji}
+                      onClick={() => handleReaction(msg.id, r.emoji)}
+                      className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] transition-all ${
+                        r.user_reacted
+                          ? 'bg-red-500/20 border border-red-500/30 text-white'
+                          : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'
+                      }`}
+                    >
+                      <span>{r.emoji}</span>
+                      <span className="font-bold">{r.count}</span>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
@@ -577,6 +699,13 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
           </button>
         </div>
       </div>
+
+      {/* XP Toast */}
+      {xpToast && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-green-600/90 text-white text-xs font-bold rounded-full animate-bounce shadow-lg z-50">
+          {xpToast}
+        </div>
+      )}
 
       {/* Sponsor Footer */}
       <div className="px-3 py-2 bg-gradient-to-r from-[#0f0f23] to-[#16162a] border-t border-white/10 text-center rounded-b-xl shrink-0">

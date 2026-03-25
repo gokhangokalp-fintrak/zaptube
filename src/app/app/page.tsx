@@ -12,6 +12,9 @@ import type { User } from '@supabase/supabase-js';
 import AdBanner from '@/components/ads/AdBanner';
 import PrerollAd from '@/components/ads/PrerollAd';
 import ChatPanel from '@/components/ChatPanel';
+import UserProfileWidget from '@/components/UserProfileWidget';
+import PollWidget from '@/components/PollWidget';
+import LiveScoreWidget from '@/components/LiveScoreWidget';
 
 const data = channelData as ChannelData;
 
@@ -1073,6 +1076,9 @@ export default function AppPage() {
         <div className="hidden lg:block w-96 shrink-0">
           <div className="sticky top-20 space-y-4">
             <ChatPanel />
+            <LiveScoreWidget />
+            <UserProfileWidget />
+            <PollWidget />
             <SponsorSidebar />
           </div>
         </div>
