@@ -179,7 +179,84 @@ function MultiViewPlayer({
 }
 
 // =============================================
-// SINGLE PLAYER MODAL — Embedded YouTube iframe
+// GLOBAL SOHBET — Live chat panel (mockup-style)
+// =============================================
+const MOCK_CHAT_MESSAGES = [
+  { user: 'Emre1905', msg: 'Bu derbi tam bir olaydı! 🔥🔥', likes: 12, avatar: '🦁' },
+  { user: 'Fener41', msg: 'Hakem berbattı, rezalet!', likes: 8, avatar: '🐤' },
+  { user: 'Arda34', msg: 'Galatasaray şampiyonluk yolunda çok iyi gidiyor 😎', likes: 5, avatar: '🦁' },
+  { user: 'Sultan1907', msg: "Fenerbahçe'nin toparlanması lazım.", likes: 4, avatar: '🐤' },
+  { user: 'Cenk54', msg: 'Bu maçtan sonra ortalık fena karışır 😅', likes: 6, avatar: '🦅' },
+  { user: 'Karadeniz61', msg: 'Trabzon bu sene süper oynuyor', likes: 3, avatar: '⭐' },
+  { user: 'Ali_GS', msg: 'Icardi yine attı, efsane! ⚽', likes: 9, avatar: '🦁' },
+];
+
+function GlobalSohbet() {
+  const [chatInput, setChatInput] = useState('');
+
+  return (
+    <div className="flex flex-col h-full bg-[#0f1724] rounded-xl border border-white/10 overflow-hidden">
+      {/* Chat Header */}
+      <div className="px-3 py-2.5 border-b border-white/10 flex items-center gap-2">
+        <span className="text-sm">💬</span>
+        <div className="flex gap-1">
+          <button className="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-xs font-bold">Global Sohbet</button>
+          <button className="px-3 py-1 rounded-full bg-white/5 text-gray-500 text-xs hover:bg-white/10 transition-colors">Kanal Sohbeti</button>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {MOCK_CHAT_MESSAGES.map((m, i) => (
+          <div key={i} className="flex gap-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-sm shrink-0">
+              {m.avatar}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white">{m.user}:</span>
+                <span className="text-xs text-gray-300">{m.msg}</span>
+              </div>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-[10px] text-gray-500">👍 {m.likes}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Emoji bar + Input */}
+      <div className="border-t border-white/10 p-2">
+        <div className="flex gap-1 mb-2">
+          {['🔥', '😂', '😤', '⚽', '👏'].map((e) => (
+            <button key={e} className="w-7 h-7 rounded bg-white/5 hover:bg-white/10 text-sm flex items-center justify-center transition-colors">
+              {e}
+            </button>
+          ))}
+          <button className="ml-auto px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 text-[10px] font-bold hover:bg-yellow-500/30 transition-colors">
+            Gönder
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Mesajınızı yazın..."
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 outline-none focus:border-yellow-500/40"
+          />
+          <button className="px-2 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 transition-colors">
+            ➤
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// SINGLE PLAYER MODAL — Mockup-style layout
+// Left: Chat | Center: Player | Right: Betting+Channels
 // =============================================
 function PlayerModal({
   video,
@@ -207,61 +284,140 @@ function PlayerModal({
     return () => window.removeEventListener('keydown', handler);
   }, [onClose, onZap]);
 
+  // Featured channels for right sidebar (exclude current)
+  const featuredChannels = data.channels.filter((ch) => ch.youtubeChannelId !== video.channelId).slice(0, 3);
+
   return (
-    <div className="fixed inset-0 z-[100] animate-fade-in" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
-      <div className="relative z-10 flex flex-col h-full" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-4 py-3" style={{ background: 'rgba(17,24,39,0.8)' }}>
-          <div className="flex items-center gap-3 min-w-0">
-            {video.live && (
-              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-xs font-bold shrink-0">
-                <span className="w-2 h-2 rounded-full bg-white live-pulse"></span> CANLI
-              </span>
-            )}
-            <h3 className="text-sm font-medium truncate text-white">{video.title}</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            {/* Zap controls in player */}
-            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-0.5">
-              <button onClick={() => onZap('prev')} className="px-2 py-1 rounded text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors" title="Önceki kanal (↑)">
-                ◀
-              </button>
-              <span className="text-[10px] text-gray-500 px-1">{currentIdx + 1}/{allVideos.length}</span>
-              <button onClick={() => onZap('next')} className="px-2 py-1 rounded text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors" title="Sonraki kanal (↓)">
-                ▶
-              </button>
-            </div>
-            <button onClick={onClose} className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white text-lg">
-              ✕
-            </button>
-          </div>
+    <div className="fixed inset-0 z-[100] animate-fade-in bg-[#0a0e1a]">
+      {/* Top Header */}
+      <header className="flex items-center justify-between px-4 py-2 border-b border-white/10" style={{ background: 'rgba(10,14,26,0.95)' }}>
+        <div className="flex items-center gap-3">
+          <span className="text-lg">📺</span>
+          <h1 className="text-sm font-bold">
+            <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">Zap</span>
+            <span className="text-white">Tube</span>
+          </h1>
         </div>
-        <div className="flex-1 flex items-center justify-center px-2 pb-2">
-          <div className="w-full max-w-5xl aspect-video rounded-xl overflow-hidden bg-black shadow-2xl">
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-gray-600">⌨ ← → ile ZAP yap · ESC kapat</span>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-sm transition-colors">
+            ✕
+          </button>
+        </div>
+      </header>
+
+      {/* 3-column layout */}
+      <div className="flex h-[calc(100vh-88px)]">
+        {/* LEFT: Global Sohbet — hidden on small screens */}
+        <div className="hidden lg:flex w-80 shrink-0 p-2">
+          <GlobalSohbet />
+        </div>
+
+        {/* CENTER: Main Player */}
+        <div className="flex-1 flex flex-col min-w-0 p-2">
+          {/* Video Title Bar */}
+          <div className="bg-[#111827] rounded-t-xl px-4 py-2.5 border border-white/10 border-b-0 flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              {video.live && (
+                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
+                </span>
+              )}
+              <h3 className="text-sm font-semibold truncate text-white">{video.title}</h3>
+            </div>
+            <div className="flex items-center gap-1 bg-white/5 rounded-lg p-0.5 shrink-0 ml-2">
+              <button onClick={() => onZap('prev')} className="px-2 py-1 rounded text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors">◀</button>
+              <span className="text-[10px] text-gray-500 px-1">{currentIdx + 1}/{allVideos.length}</span>
+              <button onClick={() => onZap('next')} className="px-2 py-1 rounded text-xs text-gray-400 hover:bg-white/10 hover:text-white transition-colors">▶</button>
+            </div>
+          </div>
+
+          {/* Player iframe */}
+          <div className="flex-1 bg-black rounded-b-xl overflow-hidden border border-white/10 border-t-0 relative">
             <iframe
+              key={videoId}
               src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
               title={video.title}
-              className="w-full h-full"
+              className="w-full h-full channel-switch"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
+            {/* Sponsor overlay at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-2 pointer-events-none">
+              <p className="text-[11px] text-gray-400 text-center">
+                Bu yayın <span className="font-bold text-yellow-400">Nesine</span> sponsorluğunda
+              </p>
+            </div>
           </div>
         </div>
-        <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'rgba(17,24,39,0.8)' }}>
-          <div className="text-sm text-gray-400">
-            <span className="text-white font-medium">{video.channelTitle}</span>
-            <span className="mx-2">&middot;</span>
-            <span>{video.live ? `${formatViewCount(video.viewCount)} izliyor` : `${formatViewCount(video.viewCount)} izlenme`}</span>
-            {!video.live && (<><span className="mx-2">&middot;</span><span>{formatDate(video.publishedAt)}</span></>)}
+
+        {/* RIGHT: Betting + Featured Channels — hidden on small screens */}
+        <div className="hidden md:flex flex-col w-64 shrink-0 p-2 gap-2 overflow-y-auto">
+          {/* Canlı Bahis Card */}
+          <div className="bg-gradient-to-br from-[#1a2332] to-[#1e293b] rounded-xl border border-yellow-500/30 overflow-hidden">
+            <div className="px-3 py-2 bg-yellow-500/20 border-b border-yellow-500/30">
+              <p className="text-xs font-black text-yellow-400 tracking-wider">CANLI BAHİS Nesine..</p>
+            </div>
+            <div className="p-3">
+              <p className="text-xs text-gray-300 font-medium mb-2 text-center">Galatasaray vs Fenerbahçe</p>
+              <div className="grid grid-cols-3 gap-1.5 mb-2">
+                <div className="bg-white/5 rounded-lg p-2 text-center hover:bg-white/10 transition-colors cursor-pointer">
+                  <p className="text-[10px] text-gray-500">1:</p>
+                  <p className="text-sm font-bold text-emerald-400">2.10</p>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 text-center hover:bg-white/10 transition-colors cursor-pointer">
+                  <p className="text-[10px] text-gray-500">X:</p>
+                  <p className="text-sm font-bold text-white">3.20</p>
+                </div>
+                <div className="bg-white/5 rounded-lg p-2 text-center hover:bg-white/10 transition-colors cursor-pointer">
+                  <p className="text-[10px] text-gray-500">2:</p>
+                  <p className="text-sm font-bold text-emerald-400">2.80</p>
+                </div>
+              </div>
+              <button className="w-full py-2 rounded-lg bg-yellow-500 text-black text-xs font-black hover:bg-yellow-400 transition-colors tracking-wider">
+                HEMEN OYNA
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-gray-600">⌨ ← → ile ZAP yap</span>
-            <a href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer"
-              className="text-xs px-3 py-1.5 rounded-full bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors">
-              YouTube&apos;da Aç ↗
-            </a>
+
+          {/* Öne Çıkan Kanallar */}
+          <div className="bg-[#111827] rounded-xl border border-white/10 overflow-hidden flex-1">
+            <div className="px-3 py-2 border-b border-white/10">
+              <p className="text-[11px] font-bold text-white tracking-wider uppercase">ÖNE ÇIKAN KANALLAR</p>
+            </div>
+            <div className="p-2 space-y-1">
+              {featuredChannels.map((ch) => (
+                <button
+                  key={ch.id}
+                  onClick={() => {
+                    const chVideo = allVideos.find((v) => v.channelId === ch.youtubeChannelId);
+                    if (chVideo) onZap('next');
+                  }}
+                  className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-white/5 transition-colors text-left group"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden">
+                    {ch.name[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium text-white truncate group-hover:text-yellow-400 transition-colors">{ch.name}</p>
+                    <p className="text-[10px] text-gray-600 truncate">{ch.description.substring(0, 35)}...</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* BOTTOM: HIZLI ZAP YAP Bar */}
+      <div className="h-11 border-t border-yellow-500/30 flex items-center justify-center gap-4" style={{ background: 'linear-gradient(to right, #1a1a2e, #16213e, #1a1a2e)' }}>
+        <button onClick={() => onZap('prev')} className="text-white text-sm font-bold hover:text-yellow-400 transition-colors">←</button>
+        <div className="flex items-center gap-2">
+          <span className="text-white font-black text-sm tracking-wider">HIZLI ZAP YAP</span>
+          <span className="text-yellow-400 text-lg">⚡</span>
+        </div>
+        <button onClick={() => onZap('next')} className="text-white text-sm font-bold hover:text-yellow-400 transition-colors">→</button>
+        <span className="text-[10px] text-gray-500 ml-4">Bu zap <span className="font-bold text-yellow-400">Nesine</span> ile</span>
       </div>
     </div>
   );
@@ -465,6 +621,10 @@ export default function AppPage() {
   const [autoZapActive, setAutoZapActive] = useState(false);
   const autoZapRef = useRef<NodeJS.Timeout | null>(null);
 
+  // TV Mode — auto-open on load
+  const [tvBooted, setTvBooted] = useState(false);
+  const [tvBootAnim, setTvBootAnim] = useState(true); // boot-up animation
+
   // Get current user
   useEffect(() => {
     const supabase = createClient();
@@ -515,6 +675,28 @@ export default function AppPage() {
       })
       .finally(() => setLoading(false));
   }, [filteredChannels]);
+
+  // TV MODE: Auto-open first live stream (or latest video) when page loads
+  useEffect(() => {
+    if (tvBooted || videos.length === 0 || activeVideo) return;
+
+    // Wait a tiny bit for boot animation to show
+    const timer = setTimeout(() => {
+      const live = videos.find((v) => v.live);
+      if (live) {
+        setActiveVideo(live);
+      } else {
+        // No live? Open the most recent video
+        const sorted = [...videos].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+        if (sorted[0]) setActiveVideo(sorted[0]);
+      }
+      setTvBooted(true);
+      // Hide boot animation after a short delay
+      setTimeout(() => setTvBootAnim(false), 1800);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [videos, tvBooted, activeVideo]);
 
   // Separate live and regular videos
   const liveVideos = useMemo(() => videos.filter((v) => v.live), [videos]);
@@ -612,6 +794,23 @@ export default function AppPage() {
 
   return (
     <main className="min-h-screen pb-20">
+      {/* TV Boot Animation Overlay */}
+      {tvBootAnim && activeVideo && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black tv-boot-overlay">
+          <div className="text-center tv-boot-content">
+            <div className="text-6xl mb-4 animate-pulse">📺</div>
+            <div className="flex items-center gap-2 justify-center mb-2">
+              <div className="w-2 h-2 rounded-full bg-red-500 live-pulse"></div>
+              <span className="text-sm font-bold text-white tracking-widest uppercase">ZapTube TV</span>
+            </div>
+            <p className="text-xs text-gray-500 animate-pulse">Kanal açılıyor...</p>
+            <div className="mt-4 w-32 h-0.5 bg-gray-800 rounded mx-auto overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-red-500 to-emerald-400 tv-boot-bar" />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Single Player Modal with Zap */}
       <PlayerModal
         video={activeVideo}
@@ -677,9 +876,9 @@ export default function AppPage() {
                 <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">Zap Yap!</span> ⚡
               </h2>
               <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
-                Takımını seç, ne izlemek istediğini belirle — seni doğru kanala zaplarız.
+                TV gibi aç, izle, zapla! Canlı yayın varsa otomatik açılır.
               </p>
-              <p className="text-gray-600 text-xs mt-2">⌨ Space ile hemen başla · ← → ile ZAP yap</p>
+              <p className="text-gray-600 text-xs mt-2">📺 Sayfa açıldığında TV gibi başlar · ← → ile kanal değiştir</p>
             </div>
           )}
 
