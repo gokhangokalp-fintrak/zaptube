@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import channelData from '@/data/channels.json';
 import { Video, ChannelData } from '@/types';
 import { getMultiChannelVideos, formatViewCount, formatDate } from '@/lib/youtube';
-import { getMockVideosForChannels } from '@/lib/mock-data';
+// Mock data removed — only real YouTube API data is used
 import { createClient } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
@@ -658,7 +658,7 @@ export default function AppPage() {
     });
   }, [selectedTeam, selectedContentType]);
 
-  // Fetch real videos from YouTube API (with cache + fallback to mock)
+  // Fetch real videos from YouTube API (no mock fallback)
   useEffect(() => {
     if (filteredChannels.length === 0) {
       setVideos([]);
@@ -670,24 +670,17 @@ export default function AppPage() {
     const channelYtIds = realChannels.map((ch) => ch.youtubeChannelId);
 
     if (!apiKey || channelYtIds.length === 0) {
-      const channelIds = filteredChannels.map((ch) => ch.id);
-      setVideos(getMockVideosForChannels(channelIds));
+      setVideos([]);
       return;
     }
 
     setLoading(true);
     getMultiChannelVideos(channelYtIds, apiKey, 3)
       .then((result) => {
-        if (result.length > 0) {
-          setVideos(result);
-        } else {
-          const channelIds = filteredChannels.map((ch) => ch.id);
-          setVideos(getMockVideosForChannels(channelIds));
-        }
+        setVideos(result);
       })
       .catch(() => {
-        const channelIds = filteredChannels.map((ch) => ch.id);
-        setVideos(getMockVideosForChannels(channelIds));
+        setVideos([]);
       })
       .finally(() => setLoading(false));
   }, [filteredChannels]);
@@ -1051,8 +1044,8 @@ export default function AppPage() {
             ) : (
               <div className="text-center py-16 text-gray-600">
                 <span className="text-4xl block mb-3">📺</span>
-                <p className="text-sm">Bu filtrelere uygun video bulunamadı.</p>
-                <p className="text-xs mt-1">Farklı bir takım veya içerik tipi deneyin.</p>
+                <p className="text-sm">Henüz video yüklenemedi.</p>
+                <p className="text-xs mt-1">YouTube API verileri çekiliyor, biraz bekle veya farklı filtre dene.</p>
               </div>
             )}
           </section>
