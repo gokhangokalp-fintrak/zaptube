@@ -1,27 +1,30 @@
 import { Video, ChannelStats } from '@/types';
+import { createClient } from '@/lib/supabase';
 
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
 // =============================================
-// MULTI-LEVEL CACHE SYSTEM
-// DiziKolik-style: Aggressive caching to prevent quota burn
+// 3-LEVEL CACHE SYSTEM
+// L1: In-memory (instant, same session)
+// L2: Supabase DB (persistent, survives restarts)
+// L3: YouTube API (expensive, quota-limited)
 // =============================================
 
-// Level 1: In-memory cache (instant, survives within session)
+// L1: In-memory cache
 const videoCache = new Map<string, { data: Video[]; timestamp: number }>();
-const VIDEO_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 HOURS (was 10 min!)
+const VIDEO_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
 
-// Level 2: Uploads playlist ID cache (UC→UU conversion, NO API call needed!)
+// Uploads playlist ID cache (UC→UU conversion, NO API call needed!)
 const uploadsPlaylistCache = new Map<string, string>();
 
-// Level 3: Channel stats cache
+// Channel stats cache
 const statsCache = new Map<string, { data: ChannelStats[]; timestamp: number }>();
-const STATS_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours for stats
+const STATS_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
 
 // =============================================
-// CACHE HELPERS
+// L1: IN-MEMORY CACHE HELPERS
 // =============================================
-function getCached(key: string): Video[] | null {
+function getL1Cache(key: string): Video[] | null {
   const entry = videoCache.get(key);
   if (!entry) return null;
   if (Date.now() - entry.timestamp > VIDEO_CACHE_TTL) {
@@ -31,8 +34,64 @@ function getCached(key: string): Video[] | null {
   return entry.data;
 }
 
-function setCache(key: string, data: Video[]): void {
+function setL1Cache(key: string, data: Video[]): void {
   videoCache.set(key, { data, timestamp: Date.now() });
+}
+
+// =============================================
+// L2: SUPABASE PERSISTENT CACHE
+// =============================================
+async function getL2Cache(key: string): Promise<Video[] | null> {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc('get_video_cache', { p_key: key });
+
+    if (error || !data) return null;
+    return data as Video[];
+  } catch {
+    // Supabase down? No problem, fall through to YouTube API
+    return null;
+  }
+}
+
+async function setL2Cache(key: string, videos: Video[], ttlHours: number = 2): Promise<void> {
+  try {
+    const supabase = createClient();
+    await supabase.rpc('set_video_cache', {
+      p_key: key,
+      p_data: JSON.stringify(videos),
+      p_ttl_hours: ttlHours,
+    });
+  } catch {
+    // Cache write failed — not critical, just log
+    console.warn('Supabase cache write failed for key:', key);
+  }
+}
+
+// =============================================
+// COMBINED CACHE: L1 → L2 → YouTube API
+// =============================================
+async function getCached(key: string): Promise<Video[] | null> {
+  // L1: In-memory (instant)
+  const l1 = getL1Cache(key);
+  if (l1) return l1;
+
+  // L2: Supabase (persistent)
+  const l2 = await getL2Cache(key);
+  if (l2) {
+    // Promote to L1 for faster subsequent access
+    setL1Cache(key, l2);
+    return l2;
+  }
+
+  return null;
+}
+
+async function setCache(key: string, data: Video[], ttlHours: number = 2): Promise<void> {
+  // Write to both levels
+  setL1Cache(key, data);
+  // Don't await — fire-and-forget to not slow down response
+  setL2Cache(key, data, ttlHours).catch(() => {});
 }
 
 // =============================================
@@ -45,7 +104,6 @@ function getUploadsPlaylistId(channelId: string): string {
     return uploadsPlaylistCache.get(channelId)!;
   }
 
-  // UC... → UU... conversion (YouTube's built-in format rule)
   const playlistId = channelId.startsWith('UC')
     ? 'UU' + channelId.substring(2)
     : channelId;
@@ -65,7 +123,7 @@ async function fetchChannelUploads(
   maxResults: number = 6
 ): Promise<Video[]> {
   const cacheKey = `uploads:${channelId}:${maxResults}`;
-  const cached = getCached(cacheKey);
+  const cached = await getCached(cacheKey);
   if (cached) return cached;
 
   try {
@@ -140,8 +198,8 @@ async function fetchChannelUploads(
       };
     });
 
-    // Cache for 2 hours!
-    setCache(cacheKey, videos);
+    // Cache for 2 hours in both L1 + L2
+    await setCache(cacheKey, videos, 2);
     return videos;
   } catch (error) {
     console.error('fetchChannelUploads error:', error);
@@ -166,7 +224,7 @@ export async function searchChannelVideos(
 
   // Search is only used when user explicitly searches (rare)
   const cacheKey = `search:${channelId}:${maxResults}:${query}`;
-  const cached = getCached(cacheKey);
+  const cached = await getCached(cacheKey);
   if (cached) return cached;
 
   try {
@@ -221,7 +279,8 @@ export async function searchChannelVideos(
       };
     });
 
-    setCache(cacheKey, videos);
+    // Search results: cache 1 hour (shorter since search is specific)
+    await setCache(cacheKey, videos, 1);
     return videos;
   } catch (error) {
     console.error('YouTube API search error:', error);
@@ -238,7 +297,7 @@ export async function getMultiChannelVideos(
   maxPerChannel: number = 4
 ): Promise<Video[]> {
   const cacheKey = `multi:${channelIds.sort().join(',')}:${maxPerChannel}`;
-  const cached = getCached(cacheKey);
+  const cached = await getCached(cacheKey);
   if (cached) return cached;
 
   // Use Promise.allSettled to prevent cascade failures
@@ -257,7 +316,8 @@ export async function getMultiChannelVideos(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
 
-  setCache(cacheKey, sorted);
+  // Multi-channel cache: 2 hours
+  await setCache(cacheKey, sorted, 2);
   return sorted;
 }
 
@@ -272,6 +332,19 @@ export async function getChannelStats(
   const cached = statsCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < STATS_CACHE_TTL) {
     return cached.data;
+  }
+
+  // Also check Supabase for stats
+  try {
+    const supabase = createClient();
+    const { data: l2Data } = await supabase.rpc('get_video_cache', { p_key: cacheKey });
+    if (l2Data) {
+      const stats = l2Data as ChannelStats[];
+      statsCache.set(cacheKey, { data: stats, timestamp: Date.now() });
+      return stats;
+    }
+  } catch {
+    // Supabase down, continue to API
   }
 
   try {
@@ -296,7 +369,21 @@ export async function getChannelStats(
       publishedAt: item.snippet.publishedAt,
     }));
 
+    // L1 cache
     statsCache.set(cacheKey, { data: stats, timestamp: Date.now() });
+
+    // L2 cache (4 hours) — fire-and-forget
+    try {
+      const supabase2 = createClient();
+      await supabase2.rpc('set_video_cache', {
+        p_key: cacheKey,
+        p_data: JSON.stringify(stats),
+        p_ttl_hours: 4,
+      });
+    } catch {
+      // Cache write failed, not critical
+    }
+
     return stats;
   } catch (error) {
     console.error('Channel stats error:', error);
