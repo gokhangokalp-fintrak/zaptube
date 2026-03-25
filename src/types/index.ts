@@ -34,6 +34,8 @@ export interface Video {
   viewCount?: string;
   duration?: string;
   url: string;
+  ytVideoId?: string;
+  live?: boolean;
 }
 
 export interface ChannelData {

@@ -1,81 +1,238 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import channelData from '@/data/channels.json';
 import { Channel, Team, ContentType, Video, ChannelData } from '@/types';
-import { getMultiChannelVideos, formatViewCount, formatDate } from '@/lib/youtube';
+import { formatViewCount, formatDate } from '@/lib/youtube';
 import { getMockVideosForChannels } from '@/lib/mock-data';
 
 const data = channelData as ChannelData;
 
+// =============================================
+// PLAYER MODAL — Embedded YouTube iframe
+// =============================================
+function PlayerModal({ video, onClose }: { video: Video | null; onClose: () => void }) {
+  if (!video) return null;
+
+  const videoId = video.ytVideoId || extractVideoId(video.url);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[100] animate-fade-in" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col h-full" onClick={(e) => e.stopPropagation()}>
+        {/* Top bar */}
+        <div className="flex items-center justify-between px-4 py-3" style={{ background: 'rgba(17,24,39,0.8)' }}>
+          <div className="flex items-center gap-3 min-w-0">
+            {video.live && (
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-xs font-bold shrink-0">
+                <span className="w-2 h-2 rounded-full bg-white live-pulse"></span> CANLI
+              </span>
+            )}
+            <h3 className="text-sm font-medium truncate text-white">{video.title}</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 ml-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white text-lg"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* YouTube Embed */}
+        <div className="flex-1 flex items-center justify-center px-2 pb-2">
+          <div className="w-full max-w-5xl aspect-video rounded-xl overflow-hidden bg-black shadow-2xl">
+            <iframe
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
+              title={video.title}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </div>
+
+        {/* Bottom info bar */}
+        <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'rgba(17,24,39,0.8)' }}>
+          <div className="text-sm text-gray-400">
+            <span className="text-white font-medium">{video.channelTitle}</span>
+            <span className="mx-2">&middot;</span>
+            <span>
+              {video.live
+                ? `${formatViewCount(video.viewCount)} izliyor`
+                : `${formatViewCount(video.viewCount)} izlenme`}
+            </span>
+            {!video.live && (
+              <>
+                <span className="mx-2">&middot;</span>
+                <span>{formatDate(video.publishedAt)}</span>
+              </>
+            )}
+          </div>
+          <a
+            href={`https://www.youtube.com/watch?v=${videoId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs px-3 py-1.5 rounded-full bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+          >
+            YouTube&apos;da Aç ↗
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================
+// LIVE BANNER — Shows currently live streams
+// =============================================
+function LiveBanner({
+  liveVideos,
+  onSelect,
+}: {
+  liveVideos: Video[];
+  onSelect: (video: Video) => void;
+}) {
+  if (liveVideos.length === 0) return null;
+
+  return (
+    <section className="mb-6 animate-slide-up">
+      <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-red-500 live-pulse"></span>
+        <span className="text-red-400 font-semibold">Şu An Canlı</span>
+        <span className="text-gray-600 text-xs">({liveVideos.length} yayın)</span>
+      </h3>
+      <div
+        className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4"
+        style={{ scrollSnapType: 'x mandatory' }}
+      >
+        {liveVideos.map((video) => (
+          <button
+            key={video.id}
+            onClick={() => onSelect(video)}
+            className="flex-shrink-0 w-72 bg-gradient-to-br from-red-950/40 to-[#1e293b] hover:from-red-950/60 border border-red-500/20 hover:border-red-500/40 rounded-xl overflow-hidden transition-all hover:scale-[1.02] group text-left"
+            style={{ scrollSnapAlign: 'start' }}
+          >
+            {/* Mini thumbnail area */}
+            <div className="relative aspect-video bg-gradient-to-br from-gray-800 to-gray-900">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-red-600/80 flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
+              </div>
+              <div className="absolute bottom-2 right-2 text-[10px] text-white/70 bg-black/60 px-1.5 py-0.5 rounded">
+                {formatViewCount(video.viewCount)} izliyor
+              </div>
+            </div>
+            <div className="p-3">
+              <p className="text-sm font-medium line-clamp-2 group-hover:text-red-400 transition-colors leading-snug">
+                {video.title}
+              </p>
+              <p className="text-[11px] text-gray-500 mt-1">{video.channelTitle}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// =============================================
+// HELPER
+// =============================================
+function extractVideoId(url: string): string {
+  const match = url.match(/[?&]v=([^&]+)/);
+  return match ? match[1] : '';
+}
+
+// =============================================
+// MAIN APP
+// =============================================
 export default function Home() {
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [selectedContentType, setSelectedContentType] = useState<string | null>(null);
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [useMock, setUseMock] = useState(true);
+  const [activeVideo, setActiveVideo] = useState<Video | null>(null);
 
   // Filter channels based on selections
   const filteredChannels = useMemo(() => {
     return data.channels.filter((ch) => {
-      const teamMatch = !selectedTeam || selectedTeam === 'genel' || ch.teams.includes(selectedTeam) || ch.teams.includes('genel');
+      const teamMatch =
+        !selectedTeam ||
+        selectedTeam === 'genel' ||
+        ch.teams.includes(selectedTeam) ||
+        ch.teams.includes('genel');
       const contentMatch = !selectedContentType || ch.contentTypes.includes(selectedContentType);
       return teamMatch && contentMatch;
     });
   }, [selectedTeam, selectedContentType]);
 
-  // Load videos when channels change
-  useEffect(() => {
-    if (filteredChannels.length === 0) {
-      setVideos([]);
-      return;
-    }
+  // Get mock videos for filtered channels
+  const allVideos = useMemo(() => {
+    const channelIds = filteredChannels.map((ch) => ch.id);
+    return getMockVideosForChannels(channelIds);
+  }, [filteredChannels]);
 
-    const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+  // Separate live and regular videos
+  const liveVideos = useMemo(() => allVideos.filter((v) => v.live), [allVideos]);
+  const regularVideos = useMemo(
+    () =>
+      allVideos
+        .filter((v) => !v.live)
+        .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
+    [allVideos]
+  );
 
-    if (!apiKey || useMock) {
-      // Use mock data
-      const channelIds = filteredChannels.map((ch) => ch.id);
-      setVideos(getMockVideosForChannels(channelIds));
-      return;
-    }
-
-    // Use real YouTube API
-    setLoading(true);
-    const channelYtIds = filteredChannels.map((ch) => ch.youtubeChannelId);
-    getMultiChannelVideos(channelYtIds, apiKey, 3)
-      .then(setVideos)
-      .finally(() => setLoading(false));
-  }, [filteredChannels, useMock]);
-
-  const handleTeamSelect = (teamId: string) => {
-    setSelectedTeam(teamId === selectedTeam ? null : teamId);
-  };
-
-  const handleContentTypeSelect = (typeId: string) => {
-    setSelectedContentType(typeId === selectedContentType ? null : typeId);
-  };
-
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setSelectedTeam(null);
     setSelectedContentType(null);
-  };
+  }, []);
 
   return (
     <main className="min-h-screen pb-20">
+      {/* Player Modal */}
+      <PlayerModal video={activeVideo} onClose={() => setActiveVideo(null)} />
+
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-sm border-b border-white/5">
+      <header
+        className="sticky top-0 z-50 border-b border-white/5"
+        style={{ background: 'rgba(17,24,39,0.95)', backdropFilter: 'blur(8px)' }}
+      >
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📺</span>
             <div>
               <h1 className="text-lg font-bold tracking-tight">
-                <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">Zap</span>Tube
+                <span className="bg-gradient-to-r from-red-500 to-emerald-400 bg-clip-text text-transparent">
+                  Zap
+                </span>
+                Tube
               </h1>
               <p className="text-xs text-gray-500 hidden sm:block">YouTube futbol kumandan</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {liveVideos.length > 0 && (
+              <span className="flex items-center gap-1.5 text-xs text-red-400">
+                <span className="w-2 h-2 rounded-full bg-red-500 live-pulse"></span>
+                {liveVideos.length} Canlı
+              </span>
+            )}
             {(selectedTeam || selectedContentType) && (
               <button
                 onClick={handleReset}
@@ -84,14 +241,6 @@ export default function Home() {
                 Sıfırla
               </button>
             )}
-            <button
-              onClick={() => setUseMock(!useMock)}
-              className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
-                useMock ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
-              }`}
-            >
-              {useMock ? '📋 Mock' : '🔴 API'}
-            </button>
           </div>
         </div>
       </header>
@@ -120,31 +269,33 @@ export default function Home() {
             </span>
             Takımını Seç
           </h3>
-          <div className="flex flex-wrap gap-2 stagger-children">
-            {data.teams.map((team) => (
-              <button
-                key={team.id}
-                onClick={() => handleTeamSelect(team.id)}
-                className={`kumanda-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  selectedTeam === team.id
-                    ? 'ring-2 ring-offset-1 ring-offset-[#0a0a0a] scale-105 shadow-lg'
-                    : 'bg-[#1a1a1a] hover:bg-[#222] text-gray-300 hover:text-white'
-                }`}
-                style={
-                  selectedTeam === team.id
-                    ? {
-                        backgroundColor: team.color + '22',
-                        color: team.color === '#000000' ? '#fff' : team.color,
-                        borderColor: team.color,
-                        boxShadow: `0 0 20px ${team.color}33, inset 0 0 0 1px ${team.color}55`,
-                      }
-                    : undefined
-                }
-              >
-                <span className="text-lg">{team.emoji}</span>
-                <span>{team.name}</span>
-              </button>
-            ))}
+          <div className="flex flex-wrap gap-2 stagger">
+            {data.teams.map((team) => {
+              const active = selectedTeam === team.id;
+              return (
+                <button
+                  key={team.id}
+                  onClick={() => setSelectedTeam(active ? null : team.id)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                    active
+                      ? 'scale-105 shadow-lg'
+                      : 'bg-[#1e293b] hover:bg-[#334155] text-gray-300 hover:text-white'
+                  }`}
+                  style={
+                    active
+                      ? {
+                          backgroundColor: team.color + '22',
+                          color: team.color === '#000000' ? '#fff' : team.color,
+                          boxShadow: `0 0 20px ${team.color}33, inset 0 0 0 1px ${team.color}55`,
+                        }
+                      : undefined
+                  }
+                >
+                  <span className="text-lg">{team.emoji}</span>
+                  <span>{team.name}</span>
+                </button>
+              );
+            })}
           </div>
         </section>
 
@@ -156,27 +307,30 @@ export default function Home() {
             </span>
             Ne İzlemek İstiyorsun?
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 stagger-children">
-            {data.contentTypes.map((ct) => (
-              <button
-                key={ct.id}
-                onClick={() => handleContentTypeSelect(ct.id)}
-                className={`kumanda-btn flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-sm transition-all duration-200 ${
-                  selectedContentType === ct.id
-                    ? 'bg-emerald-500/15 ring-1 ring-emerald-500/50 text-emerald-300 scale-105'
-                    : 'bg-[#1a1a1a] hover:bg-[#222] text-gray-400 hover:text-white'
-                }`}
-              >
-                <span className="text-xl">{ct.emoji}</span>
-                <span className="font-medium text-xs">{ct.name}</span>
-              </button>
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 stagger">
+            {data.contentTypes.map((ct) => {
+              const active = selectedContentType === ct.id;
+              return (
+                <button
+                  key={ct.id}
+                  onClick={() => setSelectedContentType(active ? null : ct.id)}
+                  className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-sm transition-all duration-200 ${
+                    active
+                      ? 'bg-emerald-500/15 ring-1 ring-emerald-500/50 text-emerald-300 scale-105'
+                      : 'bg-[#1e293b] hover:bg-[#334155] text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <span className="text-xl">{ct.emoji}</span>
+                  <span className="font-medium text-xs">{ct.name}</span>
+                </button>
+              );
+            })}
           </div>
         </section>
 
         {/* Active Filters Display */}
         {(selectedTeam || selectedContentType) && (
-          <div className="flex items-center gap-2 mb-4 text-sm text-gray-400 animate-slide-up">
+          <div className="flex flex-wrap items-center gap-2 mb-4 text-sm text-gray-400 animate-slide-up">
             <span>🔍</span>
             {selectedTeam && (
               <span className="px-2 py-0.5 rounded-md bg-white/5">
@@ -191,26 +345,33 @@ export default function Home() {
               </span>
             )}
             <span className="text-gray-600">
-              — {filteredChannels.length} kanal, {videos.length} video
+              — {filteredChannels.length} kanal, {allVideos.length} video
             </span>
           </div>
         )}
+
+        {/* LIVE SECTION */}
+        <LiveBanner liveVideos={liveVideos} onSelect={setActiveVideo} />
 
         {/* Matching Channels */}
         {filteredChannels.length > 0 && (selectedTeam || selectedContentType) && (
           <section className="mb-6 animate-slide-up">
             <h3 className="text-sm font-medium text-gray-500 mb-3">📡 Eşleşen Kanallar</h3>
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 snap-x">
+            <div
+              className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4"
+              style={{ scrollSnapType: 'x mandatory' }}
+            >
               {filteredChannels.map((ch) => (
                 <a
                   key={ch.id}
                   href={`https://www.youtube.com/channel/${ch.youtubeChannelId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-shrink-0 snap-start bg-[#1a1a1a] hover:bg-[#222] rounded-xl p-3 w-48 transition-all hover:scale-[1.02] group"
+                  className="flex-shrink-0 bg-[#1e293b] hover:bg-[#334155] rounded-xl p-3 w-48 transition-all hover:scale-[1.02] group"
+                  style={{ scrollSnapAlign: 'start' }}
                 >
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-lg font-bold">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-lg font-bold shrink-0">
                       {ch.name[0]}
                     </div>
                     <div className="min-w-0">
@@ -219,7 +380,10 @@ export default function Home() {
                       </p>
                       <div className="flex gap-1 mt-0.5">
                         {ch.teams.map((t) => (
-                          <span key={t} className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500">
+                          <span
+                            key={t}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-500"
+                          >
                             {data.teams.find((team) => team.id === t)?.emoji}
                           </span>
                         ))}
@@ -233,41 +397,33 @@ export default function Home() {
           </section>
         )}
 
-        {/* Videos Grid */}
+        {/* Videos Grid — click opens embedded player */}
         <section>
           <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
-            <span>🎬</span>
-            {selectedTeam || selectedContentType ? 'Önerilen Videolar' : 'Son Videolar'}
+            🎬 {selectedTeam || selectedContentType ? 'Önerilen Videolar' : 'Son Videolar'}
           </h3>
 
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="bg-[#1a1a1a] rounded-xl overflow-hidden animate-pulse">
-                  <div className="aspect-video bg-gray-800" />
-                  <div className="p-3 space-y-2">
-                    <div className="h-4 bg-gray-800 rounded w-3/4" />
-                    <div className="h-3 bg-gray-800 rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : videos.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
-              {videos.map((video) => (
-                <a
+          {regularVideos.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
+              {regularVideos.map((video) => (
+                <button
                   key={video.id}
-                  href={video.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group bg-[#1a1a1a] hover:bg-[#222] rounded-xl overflow-hidden transition-all duration-200 hover:scale-[1.02] hover:shadow-xl hover:shadow-black/20"
+                  onClick={() => setActiveVideo(video)}
+                  className="group bg-[#1e293b] hover:bg-[#334155] rounded-xl overflow-hidden transition-all duration-200 hover:scale-[1.02] hover:shadow-xl hover:shadow-black/20 text-left w-full"
                 >
                   {/* Thumbnail */}
                   <div className="relative aspect-video bg-gray-800">
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent z-10" />
-                    {/* Placeholder thumbnail */}
                     <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
-                      <span className="text-4xl opacity-30">▶️</span>
+                      <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 group-hover:scale-110 transition-all">
+                        <svg
+                          className="w-5 h-5 text-white ml-0.5"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
                     </div>
                     {video.duration && (
                       <span className="absolute bottom-2 right-2 z-20 text-[10px] font-medium bg-black/80 px-1.5 py-0.5 rounded">
@@ -291,7 +447,7 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                </a>
+                </button>
               ))}
             </div>
           ) : (
