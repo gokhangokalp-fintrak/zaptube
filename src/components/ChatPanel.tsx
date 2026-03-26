@@ -416,6 +416,8 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
 
   const isGuest = !user;
 
+  // Misafirler mesajları görebilir ama yazamaz — aşağıda input yerine üye ol CTA gösterilir
+
   return (
     <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10 relative" style={{ height: '600px' }}>
       {/* Header */}
