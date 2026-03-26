@@ -115,13 +115,58 @@ function MultiViewPlayer({
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [onlineCount] = useState(() => Math.floor(Math.random() * 2000) + 1200);
-  const [chatMessages, setChatMessages] = useState([
-    { user: 'Emre1905', msg: '4 kanal aynı anda, efsane! 🔥', avatar: '🦁', time: '21:30', likes: 12, pinned: false },
-    { user: 'Fener41', msg: 'Hangi kanalda daha güzel analiz var?', avatar: '🐤', time: '21:31', likes: 8, pinned: false },
-    { user: 'Arda34', msg: 'Ses geçişi çok iyi çalışıyor 💪', avatar: '🦅', time: '21:32', likes: 5, pinned: false },
-    { user: 'Sultan1907', msg: 'Bugün herkes canlı, süper akşam!', avatar: '🐤', time: '21:33', likes: 3, pinned: false },
-    { user: 'ZapTube', msg: '🔥 Maç sonrası 4 kanalı aynı anda izleyin! Ok tuşlarıyla ses değiştirin.', avatar: '⚡', time: '21:28', likes: 24, pinned: true },
+  const [zapFlash, setZapFlash] = useState(false);
+  const [autoDirector, setAutoDirector] = useState(false);
+
+  // Auto Director — her 15sn rastgele başka kanala geç
+  useEffect(() => {
+    if (!autoDirector || videos.length <= 1) return;
+    const interval = setInterval(() => {
+      const nextIdx = (activeAudioIndex + 1 + Math.floor(Math.random() * (videos.length - 1))) % videos.length;
+      onAudioSwitch(nextIdx);
+      if (focusIndex !== null) setFocusIndex(nextIdx);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [autoDirector, videos.length, activeAudioIndex, onAudioSwitch, focusIndex]);
+
+  // Chat messages with reactions
+  type ChatMsg = { user: string; msg: string; avatar: string; time: string; likes: number; pinned: boolean; reactions: Record<string, number> };
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([
+    { user: 'Emre1905', msg: '4 kanal aynı anda, efsane!', avatar: '🦁', time: '21:30', likes: 12, pinned: false, reactions: { '🔥': 8, '👍': 4 } },
+    { user: 'Fener41', msg: 'Hangi kanalda daha güzel analiz var?', avatar: '🐤', time: '21:31', likes: 8, pinned: false, reactions: { '👍': 3 } },
+    { user: 'Arda34', msg: 'Ses geçişi çok iyi çalışıyor', avatar: '🦅', time: '21:32', likes: 5, pinned: false, reactions: { '💪': 5 } },
+    { user: 'Sultan1907', msg: 'Bugün herkes canlı, süper akşam!', avatar: '🐤', time: '21:33', likes: 3, pinned: false, reactions: { '🔥': 2, '😂': 1 } },
+    { user: 'ZapTube', msg: 'Ok tuşlarıyla kanallar arası geçiş yap! 1-8 ile direkt seç.', avatar: '⚡', time: '21:28', likes: 24, pinned: true, reactions: { '🔥': 24 } },
   ]);
+
+  // Zap flash — kanal değiştirince sponsor overlay
+  const prevAudioRef = useRef(activeAudioIndex);
+  useEffect(() => {
+    if (prevAudioRef.current !== activeAudioIndex) {
+      prevAudioRef.current = activeAudioIndex;
+      setZapFlash(true);
+      const t = setTimeout(() => setZapFlash(false), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [activeAudioIndex]);
+
+  // Reaction handler
+  const handleReaction = (msgIdx: number, emoji: string) => {
+    setChatMessages(prev => prev.map((m, i) => {
+      if (i !== msgIdx) return m;
+      const newReactions = { ...m.reactions };
+      newReactions[emoji] = (newReactions[emoji] || 0) + 1;
+      return { ...m, reactions: newReactions, likes: m.likes + 1 };
+    }));
+  };
+
+  // Auto-pin: en çok reaction alan mesaj otomatik sabitlensin
+  const topReactionMsg = useMemo(() => {
+    const nonPinned = chatMessages.filter(m => !m.pinned);
+    if (nonPinned.length === 0) return null;
+    const sorted = [...nonPinned].sort((a, b) => b.likes - a.likes);
+    return sorted[0]?.likes >= 10 ? sorted[0] : null;
+  }, [chatMessages]);
 
   // 5+ video → otomatik focus mode başlat
   useEffect(() => {
@@ -176,7 +221,7 @@ function MultiViewPlayer({
   const handleChatSend = () => {
     if (!chatInput.trim()) return;
     setChatMessages(prev => [...prev, {
-      user: 'Sen', msg: chatInput.trim(), avatar: '⚡', likes: 0, pinned: false,
+      user: 'Sen', msg: chatInput.trim(), avatar: '⚡', likes: 0, pinned: false, reactions: {},
       time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
     }]);
     setChatInput('');
@@ -193,6 +238,19 @@ function MultiViewPlayer({
 
   return (
     <div className="fixed inset-0 z-[100] animate-fade-in flex flex-col" style={{ background: 'rgba(0,0,0,0.97)' }}>
+      {/* ZAP FLASH — kanal değiştirince sponsor overlay */}
+      {zapFlash && (
+        <div className="absolute inset-0 z-[110] pointer-events-none flex items-center justify-center" style={{ animation: 'zapFlash 1.2s ease-out forwards' }}>
+          <div className="bg-black/70 backdrop-blur-sm px-6 py-3 rounded-2xl flex items-center gap-3" style={{ animation: 'zapScale 0.3s ease-out' }}>
+            <span className="text-2xl">⚡</span>
+            <div>
+              <p className="text-white font-bold text-sm">ZAP!</p>
+              <p className="text-emerald-400 text-[10px] font-medium">Nesine ile kanal değiştir</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 shrink-0" style={{ background: 'rgba(17,24,39,0.95)' }}>
         <div className="flex items-center gap-3">
@@ -216,7 +274,19 @@ function MultiViewPlayer({
             </button>
           )}
 
-          <span className="text-[10px] text-gray-600 hidden lg:block">← → kanal geçiş | 1-{videos.length} direkt seç | {videos.length <= 4 ? 'F focus | ' : ''}ESC kapat</span>
+          {/* Auto Director toggle */}
+          <button
+            onClick={() => setAutoDirector(prev => !prev)}
+            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+              autoDirector
+                ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/30 animate-pulse'
+                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            {autoDirector ? '🎬 Auto Zap ON' : '🎬 Auto Zap'}
+          </button>
+
+          <span className="text-[10px] text-gray-600 hidden lg:block">← → geçiş | 1-{videos.length} seç | {videos.length <= 4 ? 'F focus | ' : ''}ESC kapat</span>
         </div>
         <div className="flex items-center gap-3">
           {/* Kanal ses seçici — büyütülmüş */}
@@ -276,32 +346,85 @@ function MultiViewPlayer({
             <div className="px-3 py-2 border-b border-yellow-500/10 bg-yellow-500/5 shrink-0">
               <div className="flex items-start gap-2">
                 <span className="text-xs">📌</span>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <span className="text-[10px] font-bold text-yellow-400">{pinnedMsg.user}</span>
                   <p className="text-xs text-yellow-200/80 leading-snug">{pinnedMsg.msg}</p>
+                  {Object.entries(pinnedMsg.reactions).length > 0 && (
+                    <div className="flex gap-1 mt-1">
+                      {Object.entries(pinnedMsg.reactions).map(([emoji, count]) => (
+                        <span key={emoji} className="text-[9px] px-1.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-300">{emoji} {count}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span className="text-[9px] text-yellow-500/60 shrink-0 ml-auto">❤ {pinnedMsg.likes}</span>
               </div>
             </div>
           )}
 
-          {/* Chat Messages — büyütülmüş */}
-          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
-            {chatMessages.filter(m => !m.pinned).map((msg, i) => (
-              <div key={i} className="flex gap-2.5 group/msg">
-                <span className="text-lg shrink-0">{msg.avatar}</span>
+          {/* Top reaction mesajı — auto-pin */}
+          {topReactionMsg && !topReactionMsg.pinned && (
+            <div className="px-3 py-2 border-b border-orange-500/10 bg-orange-500/5 shrink-0">
+              <div className="flex items-start gap-2">
+                <span className="text-xs">🏆</span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-bold text-yellow-400">{msg.user}</span>
-                    <span className="text-[10px] text-gray-600">{msg.time}</span>
-                    {msg.likes > 0 && (
-                      <span className="text-[9px] text-red-400/60 ml-auto opacity-0 group-hover/msg:opacity-100 transition-opacity">❤ {msg.likes}</span>
-                    )}
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-[10px] font-bold text-orange-400">{topReactionMsg.user}</span>
+                    <span className="text-[9px] text-orange-500/40">en popüler</span>
                   </div>
-                  <p className="text-sm text-gray-200 leading-relaxed break-words">{msg.msg}</p>
+                  <p className="text-xs text-orange-200/80 leading-snug">{topReactionMsg.msg}</p>
+                  <div className="flex gap-1 mt-1">
+                    {Object.entries(topReactionMsg.reactions).map(([emoji, count]) => (
+                      <span key={emoji} className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/10 text-orange-300">{emoji} {count}</span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Chat Messages — reaction destekli */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
+            {chatMessages.filter(m => !m.pinned).map((msg, msgIdx) => {
+              const actualIdx = chatMessages.indexOf(msg);
+              return (
+                <div key={msgIdx} className="flex gap-2.5 group/msg">
+                  <span className="text-lg shrink-0">{msg.avatar}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-sm font-bold text-yellow-400">{msg.user}</span>
+                      <span className="text-[10px] text-gray-600">{msg.time}</span>
+                    </div>
+                    <p className="text-sm text-gray-200 leading-relaxed break-words">{msg.msg}</p>
+                    {/* Reactions display */}
+                    {Object.entries(msg.reactions).length > 0 && (
+                      <div className="flex gap-1 mt-1">
+                        {Object.entries(msg.reactions).map(([emoji, count]) => (
+                          <button
+                            key={emoji}
+                            onClick={() => handleReaction(actualIdx, emoji)}
+                            className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                          >
+                            {emoji} {count}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* Reaction buttons — hover */}
+                    <div className="flex gap-0.5 mt-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                      {['👍', '😂', '🔥', '💪', '❤️'].map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => handleReaction(actualIdx, emoji)}
+                          className="text-xs px-1 py-0.5 rounded hover:bg-white/10 transition-colors"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
             <div ref={chatEndRef} />
           </div>
 
@@ -351,14 +474,34 @@ function MultiViewPlayer({
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
-                      {/* Büyük kanal adı overlay */}
-                      <div className="absolute top-3 left-3 flex items-center gap-2">
-                        <span className="px-3 py-1.5 rounded-lg bg-emerald-500/30 text-emerald-300 text-sm font-bold backdrop-blur-sm">
-                          🔊 {video.channelTitle}
-                        </span>
-                        <span className="px-2 py-1 rounded bg-red-600 text-white text-[10px] font-bold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
-                        </span>
+                      {/* Üst bar: kanal adı + rozetler */}
+                      <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1.5 rounded-lg bg-emerald-500/30 text-emerald-300 text-sm font-bold backdrop-blur-sm">
+                            🔊 {video.channelTitle}
+                          </span>
+                          {video.live && (
+                            <span className="px-2 py-1 rounded bg-red-600 text-white text-[10px] font-bold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
+                            </span>
+                          )}
+                        </div>
+                        {/* Anlık rozetler */}
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-1 rounded-lg bg-black/60 text-[10px] text-red-400 font-bold backdrop-blur-sm flex items-center gap-1">
+                            🔥 {(onlineCount + Math.floor(Math.random() * 200)).toLocaleString('tr-TR')} kişi burada
+                          </span>
+                          {focusIndex === 0 && (
+                            <span className="px-2 py-1 rounded-lg bg-yellow-500/20 text-[10px] text-yellow-400 font-bold backdrop-blur-sm">
+                              ⚡ En çok izlenen
+                            </span>
+                          )}
+                          {videos.length >= 4 && focusIndex !== null && focusIndex >= videos.length - 2 && (
+                            <span className="px-2 py-1 rounded-lg bg-purple-500/20 text-[10px] text-purple-400 font-bold backdrop-blur-sm">
+                              💥 Trend
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {/* Sponsor overlay alt */}
                       <div className="absolute bottom-3 right-3">
@@ -371,21 +514,22 @@ function MultiViewPlayer({
                 })()}
               </div>
 
-              {/* Alt preview strip — yatay scroll ile 8'e kadar */}
-              <div className="flex gap-1 h-24 shrink-0 overflow-x-auto" style={{ scrollSnapType: 'x mandatory' }}>
+              {/* Alt preview strip — glow efektli, yatay scroll */}
+              <div className="flex gap-1.5 h-24 shrink-0 overflow-x-auto px-1 py-1" style={{ scrollSnapType: 'x mandatory' }}>
                 {videos.map((video, idx) => {
                   const videoId = video.ytVideoId || extractVideoId(video.url);
                   const isFocused = idx === focusIndex;
+                  const isAudio = idx === activeAudioIndex;
                   return (
                     <button
                       key={video.id}
                       onClick={() => { setFocusIndex(idx); onAudioSwitch(idx); }}
-                      className={`relative shrink-0 rounded-lg overflow-hidden transition-all ${
+                      className={`relative shrink-0 rounded-lg overflow-hidden transition-all duration-300 ${
                         videos.length <= 4 ? 'flex-1' : 'w-40'
                       } ${
                         isFocused
-                          ? 'ring-2 ring-emerald-500 opacity-100'
-                          : 'opacity-50 hover:opacity-80'
+                          ? 'ring-2 ring-emerald-400 opacity-100 scale-105 shadow-lg shadow-emerald-500/30'
+                          : 'opacity-40 hover:opacity-75 scale-95'
                       }`}
                       style={{ scrollSnapAlign: 'start' }}
                     >
@@ -404,19 +548,20 @@ function MultiViewPlayer({
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900" />
                           )}
-                          {isFocused && (
-                            <div className="absolute inset-0 bg-black/20" />
-                          )}
                         </div>
                       )}
-                      {/* Kanal adı overlay */}
+                      {/* Kanal adı + ses ikonu overlay */}
                       <div className="absolute inset-0 flex items-end">
-                        <div className="w-full px-2 py-1 bg-gradient-to-t from-black/90 to-transparent">
-                          <p className={`text-[10px] font-bold truncate ${isFocused ? 'text-emerald-400' : 'text-white'}`}>
-                            {idx === activeAudioIndex ? '🔊' : `${idx + 1}`} {video.channelTitle}
+                        <div className={`w-full px-2 py-1.5 ${isFocused ? 'bg-gradient-to-t from-emerald-900/90 to-transparent' : 'bg-gradient-to-t from-black/90 to-transparent'}`}>
+                          <p className={`text-[10px] font-bold truncate ${isFocused ? 'text-emerald-300' : 'text-gray-400'}`}>
+                            {isAudio ? '🔊' : `${idx + 1}`} {video.channelTitle}
                           </p>
                         </div>
                       </div>
+                      {/* Glow efekti — aktif kanal */}
+                      {isFocused && (
+                        <div className="absolute inset-0 rounded-lg pointer-events-none" style={{ boxShadow: 'inset 0 0 20px rgba(16, 185, 129, 0.15)' }} />
+                      )}
                     </button>
                   );
                 })}
