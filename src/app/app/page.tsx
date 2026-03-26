@@ -517,7 +517,7 @@ function PlayerModal({
       <div className="flex h-[calc(100vh-88px)]">
         {/* LEFT: Global Sohbet — hidden on small screens */}
         <div className="hidden lg:flex w-80 shrink-0 p-2">
-          <GlobalSohbet />
+          <ChatPanel />
         </div>
 
         {/* CENTER: Main Player */}
