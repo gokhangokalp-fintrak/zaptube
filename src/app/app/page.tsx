@@ -246,6 +246,7 @@ function MultiViewPlayer({
     setChatInput('');
   };
 
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const isFocusMode = focusIndex !== null;
   const pinnedMsg = chatMessages.find(m => m.pinned);
 
@@ -729,6 +730,114 @@ function MultiViewPlayer({
           </div>
         </div>
       </div>
+
+      {/* MOBILE CHAT — FAB + overlay (lg altında görünür) */}
+      <button
+        onClick={() => setMobileChatOpen(true)}
+        className="lg:hidden fixed bottom-4 right-4 z-[110] w-12 h-12 rounded-full bg-yellow-500/90 text-black flex items-center justify-center shadow-lg shadow-yellow-500/30 active:scale-95 transition-transform"
+      >
+        <span className="text-lg">💬</span>
+        {chatMessages.length > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+            {chatMessages.filter(m => !m.pinned).length}
+          </span>
+        )}
+      </button>
+
+      {mobileChatOpen && (
+        <div className="lg:hidden fixed inset-0 z-[120] flex flex-col">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileChatOpen(false)} />
+
+          {/* Chat drawer — alttan %70 */}
+          <div className="absolute bottom-0 left-0 right-0 max-h-[75vh] flex flex-col animate-drawer-up" style={{ background: 'rgba(15,23,36,0.98)' }}>
+            {/* Handle + Header */}
+            <div className="flex flex-col items-center pt-2 pb-1 border-b border-white/10 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-white/20 mb-2" />
+              <div className="w-full px-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">💬</span>
+                  <span className="text-sm font-bold text-white">Canlı Sohbet</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block mr-1 live-pulse"></span>
+                    CANLI
+                  </span>
+                </div>
+                <button onClick={() => setMobileChatOpen(false)} className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white text-sm">✕</button>
+              </div>
+              <span className="text-[10px] text-yellow-400 font-bold mt-1">{onlineCount.toLocaleString('tr-TR')} kişi sohbet ediyor 🔥</span>
+            </div>
+
+            {/* Pinned */}
+            {pinnedMsg && (
+              <div className="px-4 py-2 border-b border-yellow-500/10 bg-yellow-500/5 shrink-0">
+                <div className="flex items-start gap-2">
+                  <span className="text-xs">📌</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold text-yellow-400">{pinnedMsg.user}</span>
+                    <p className="text-xs text-yellow-200/80 leading-snug">{pinnedMsg.msg}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4 py-2 space-y-3">
+              {chatMessages.filter(m => !m.pinned).map((msg, msgIdx) => {
+                const actualIdx = chatMessages.indexOf(msg);
+                return (
+                  <div key={msgIdx} className="flex gap-2.5">
+                    <span className="text-lg shrink-0">{msg.avatar}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-sm font-bold text-yellow-400">{msg.user}</span>
+                        <span className="text-[10px] text-gray-600">{msg.time}</span>
+                      </div>
+                      <p className="text-sm text-gray-200 leading-relaxed break-words">{msg.msg}</p>
+                      {Object.entries(msg.reactions).length > 0 && (
+                        <div className="flex gap-1 mt-1 flex-wrap">
+                          {Object.entries(msg.reactions).map(([emoji, count]) => (
+                            <button key={emoji} onClick={() => handleReaction(actualIdx, emoji)}
+                              className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 hover:bg-white/10 text-gray-400">
+                              {emoji} {count}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-1 mt-1">
+                        {['👍', '😂', '🔥', '💪', '❤️'].map((emoji) => (
+                          <button key={emoji} onClick={() => handleReaction(actualIdx, emoji)}
+                            className="text-sm px-1.5 py-1 rounded hover:bg-white/10 transition-colors">
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Input */}
+            <div className="p-3 border-t border-white/10 shrink-0">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleChatSend()}
+                  placeholder="Mesaj yaz..."
+                  className="flex-1 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-yellow-500/40"
+                />
+                <button onClick={handleChatSend}
+                  className="px-4 py-2.5 bg-yellow-500/20 text-yellow-400 rounded-lg text-xs font-bold hover:bg-yellow-500/30 transition-colors shrink-0">
+                  Gönder
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
