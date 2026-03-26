@@ -8,6 +8,7 @@ import { formatViewCount } from '@/lib/youtube';
 import { getUserPreferences, toggleFollow, toggleFavorite } from '@/lib/supabase-db';
 import { createClient } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import { GuestReminderBanner } from '@/components/GuestPrompt';
 
 const data = channelData as ChannelData;
 
@@ -72,9 +73,17 @@ export default function ChannelsPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const [showGuestToast, setShowGuestToast] = useState(false);
+  const [guestToastMsg, setGuestToastMsg] = useState('');
+
+  const handleGuestBlock = (msg: string) => {
+    setGuestToastMsg(msg);
+    setShowGuestToast(true);
+  };
+
   const handleFollow = async (channelId: string) => {
     if (!user) {
-      showToast('Takip etmek için giriş yapmalısın');
+      handleGuestBlock('Kanalı takip etmek için ücretsiz üye ol');
       return;
     }
     setActionLoading(channelId + '-follow');
@@ -95,7 +104,7 @@ export default function ChannelsPage() {
 
   const handleFavorite = async (channelId: string) => {
     if (!user) {
-      showToast('Favorilere eklemek için giriş yapmalısın');
+      handleGuestBlock('Favorilere eklemek için ücretsiz üye ol');
       return;
     }
     setActionLoading(channelId + '-fav');
@@ -116,6 +125,29 @@ export default function ChannelsPage() {
 
   return (
     <main className="min-h-screen">
+      {/* Misafir hatırlatma */}
+      {!user && <GuestReminderBanner />}
+
+      {/* Misafir aksiyon engeli toast */}
+      {showGuestToast && (
+        <div className="fixed top-4 right-4 z-[200] bg-orange-500/90 backdrop-blur-sm text-white text-sm px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-slide-down max-w-sm">
+          <span>{guestToastMsg}</span>
+          <button
+            onClick={async () => {
+              const supabase = createClient();
+              await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: { redirectTo: `${window.location.origin}/auth/callback` },
+              });
+            }}
+            className="shrink-0 px-2.5 py-1 bg-white text-gray-900 text-xs font-bold rounded-lg hover:bg-gray-100 transition-all"
+          >
+            Üye Ol
+          </button>
+          <button onClick={() => setShowGuestToast(false)} className="text-white/60 hover:text-white shrink-0">✕</button>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
         <div className={`fixed top-4 right-4 z-[200] text-white text-sm px-4 py-2.5 rounded-xl shadow-xl ${toast.startsWith('✓') || toast.startsWith('★') ? 'bg-emerald-500/90' : toast.startsWith('Hata') ? 'bg-red-500/90' : 'bg-orange-500/90'}`}>

@@ -34,29 +34,29 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protected routes: /app and its sub-routes
-  if (request.nextUrl.pathname.startsWith('/app')) {
+  // Admin routes: only authenticated admins
+  if (request.nextUrl.pathname.startsWith('/app/admin')) {
     if (!user) {
       const url = request.nextUrl.clone();
       url.pathname = '/';
       return NextResponse.redirect(url);
     }
 
-    // Admin routes: check admin_users table
-    if (request.nextUrl.pathname.startsWith('/app/admin')) {
-      const { data: adminUser } = await supabase
-        .from('admin_users')
-        .select('id')
-        .eq('email', user.email || '')
-        .single();
+    const { data: adminUser } = await supabase
+      .from('admin_users')
+      .select('id')
+      .eq('email', user.email || '')
+      .single();
 
-      if (!adminUser) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/app';
-        return NextResponse.redirect(url);
-      }
+    if (!adminUser) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/app';
+      return NextResponse.redirect(url);
     }
   }
+
+  // /app routes: allow guest access (no auth required)
+  // Chat, notifications etc. are restricted in the components themselves
 
   // If user is logged in and visits landing page, redirect to /app
   if (request.nextUrl.pathname === '/' && user) {

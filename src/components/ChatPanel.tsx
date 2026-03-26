@@ -108,7 +108,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Initialize
+  // Initialize — misafirler de odaları ve mesajları görebilir
   useEffect(() => {
     const init = async () => {
       try {
@@ -116,17 +116,20 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
           setUser(authUser);
-          const roomsList = await getChatRooms();
-          const sorted = sortRooms(roomsList);
-          setRooms(sorted);
-          if (sorted.length > 0) {
-            const generalRoom = sorted.find((r) => r.type === 'general') || sorted[0];
-            setSelectedRoom(generalRoom);
-            await loadMessages(generalRoom.id);
-            await loadPinnedMessages(generalRoom.id);
-          }
         }
-        // Also listen for auth changes
+
+        // Odaları ve mesajları herkes görebilir
+        const roomsList = await getChatRooms();
+        const sorted = sortRooms(roomsList);
+        setRooms(sorted);
+        if (sorted.length > 0) {
+          const generalRoom = sorted.find((r) => r.type === 'general') || sorted[0];
+          setSelectedRoom(generalRoom);
+          await loadMessages(generalRoom.id);
+          await loadPinnedMessages(generalRoom.id);
+        }
+
+        // Auth state değişikliklerini dinle
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
           if (session?.user) {
             setUser(session.user);
@@ -411,18 +414,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10" style={{ height: '600px' }}>
-        <div className="p-4 border-b border-white/10 bg-[#16162a] rounded-t-xl">
-          <h3 className="font-bold text-white text-center">CANLI SOHBET</h3>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-gray-400 text-sm">Sohbet için giriş yapın</p>
-        </div>
-      </div>
-    );
-  }
+  const isGuest = !user;
 
   return (
     <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10 relative" style={{ height: '600px' }}>
@@ -656,19 +648,21 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Reactions */}
-      <div className="px-3 py-2 border-t border-white/10 flex gap-1 flex-wrap shrink-0">
-        {QUICK_REACTIONS.map((reaction, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleQuickReaction(reaction.emoji, reaction.label)}
-            className={`bg-gradient-to-r ${reaction.color} px-2 py-1 rounded-lg text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1`}
-          >
-            <span>{reaction.emoji}</span>
-            {reaction.label && <span>{reaction.label}</span>}
-          </button>
-        ))}
-      </div>
+      {/* Quick Reactions — sadece üyeler */}
+      {!isGuest && (
+        <div className="px-3 py-2 border-t border-white/10 flex gap-1 flex-wrap shrink-0">
+          {QUICK_REACTIONS.map((reaction, idx) => (
+            <button
+              key={idx}
+              onClick={() => handleQuickReaction(reaction.emoji, reaction.label)}
+              className={`bg-gradient-to-r ${reaction.color} px-2 py-1 rounded-lg text-white text-xs font-bold hover:brightness-110 active:scale-95 transition-all flex items-center gap-1`}
+            >
+              <span>{reaction.emoji}</span>
+              {reaction.label && <span>{reaction.label}</span>}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Spam warning */}
       {spamWarning && (
@@ -677,27 +671,45 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         </div>
       )}
 
-      {/* Message Input */}
+      {/* Message Input — sadece üyeler mesaj gönderebilir */}
       <div className="p-3 border-t border-white/10 bg-[#16162a] shrink-0">
-        <div className="flex gap-2 items-center">
-          <input
-            type="text"
-            placeholder="Mesajını yaz..."
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-            disabled={sending}
-            maxLength={500}
-            className="flex-1 bg-[#0f0f23] text-white text-sm rounded-lg px-3 py-2 border border-white/10 placeholder-gray-500 focus:outline-none focus:border-red-500/50 disabled:opacity-50"
-          />
-          <button
-            onClick={() => handleSendMessage()}
-            disabled={sending || !messageInput.trim()}
-            className="w-9 h-9 bg-red-600 text-white rounded-lg flex items-center justify-center hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
-          >
-            <span className="text-sm">▶</span>
-          </button>
-        </div>
+        {isGuest ? (
+          <div className="flex items-center justify-center gap-2 py-1">
+            <span className="text-gray-500 text-xs">Mesaj göndermek için</span>
+            <button
+              onClick={async () => {
+                const supabase = getSupabase();
+                await supabase.auth.signInWithOAuth({
+                  provider: 'google',
+                  options: { redirectTo: `${window.location.origin}/auth/callback` },
+                });
+              }}
+              className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white rounded-lg font-medium transition-colors"
+            >
+              Giriş Yap
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2 items-center">
+            <input
+              type="text"
+              placeholder="Mesajını yaz..."
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+              disabled={sending}
+              maxLength={500}
+              className="flex-1 bg-[#0f0f23] text-white text-sm rounded-lg px-3 py-2 border border-white/10 placeholder-gray-500 focus:outline-none focus:border-red-500/50 disabled:opacity-50"
+            />
+            <button
+              onClick={() => handleSendMessage()}
+              disabled={sending || !messageInput.trim()}
+              className="w-9 h-9 bg-red-600 text-white rounded-lg flex items-center justify-center hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors active:scale-95"
+            >
+              <span className="text-sm">▶</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* XP Toast */}
