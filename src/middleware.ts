@@ -41,6 +41,21 @@ export async function middleware(request: NextRequest) {
       url.pathname = '/';
       return NextResponse.redirect(url);
     }
+
+    // Admin routes: check admin_users table
+    if (request.nextUrl.pathname.startsWith('/app/admin')) {
+      const { data: adminUser } = await supabase
+        .from('admin_users')
+        .select('id')
+        .eq('email', user.email || '')
+        .single();
+
+      if (!adminUser) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/app';
+        return NextResponse.redirect(url);
+      }
+    }
   }
 
   // If user is logged in and visits landing page, redirect to /app

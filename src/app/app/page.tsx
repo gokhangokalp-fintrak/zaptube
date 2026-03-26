@@ -1099,6 +1099,9 @@ export default function AppPage() {
               <Link href="/app/stats" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 📊 Reyting
               </Link>
+              <Link href="/app/admin" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-red-400 transition-colors">
+                ⚙ Admin
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">

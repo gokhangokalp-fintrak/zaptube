@@ -1,13 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
-
-// react-twitter-embed — widgets.js wrapper with better React lifecycle handling
-const TwitterTimelineEmbed = dynamic(
-  () => import('react-twitter-embed').then(mod => mod.TwitterTimelineEmbed),
-  { ssr: false }
-);
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Türk futbol dünyasının sürekli tweet atan yüksek takipçili hesapları
 const FOOTBALL_ACCOUNTS = [
@@ -45,6 +38,8 @@ interface TwitterTimelineProps {
   title?: string;
 }
 
+type LoadState = 'loading' | 'syndication' | 'embed' | 'fallback';
+
 export default function TwitterTimeline({
   handle,
   height = 500,
@@ -55,20 +50,99 @@ export default function TwitterTimeline({
 }: TwitterTimelineProps) {
   const [selectedHandle, setSelectedHandle] = useState(handle || FOOTBALL_ACCOUNTS[0].handle);
   const [embedKey, setEmbedKey] = useState(0);
-  const [showFallback, setShowFallback] = useState(false);
+  const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [syndicationHtml, setSyndicationHtml] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const embedHandle = handle || selectedHandle;
+  const effectiveHeight = compact ? 300 : height;
 
   useEffect(() => {
     if (handle) setSelectedHandle(handle);
   }, [handle]);
 
-  // Timeout — eğer 12 saniye içinde yüklenmezse fallback göster
+  // Server-side syndication API'den tweet HTML'i çek
+  const fetchSyndication = useCallback(async (h: string) => {
+    try {
+      const res = await fetch(`/api/twitter/syndication?handle=${encodeURIComponent(h)}`);
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.html && data.html.length > 100) {
+        return data.html as string;
+      }
+    } catch (e) {
+      console.log('[TwitterTimeline] Syndication fetch failed:', e);
+    }
+    return null;
+  }, []);
+
+  // Ana yükleme stratejisi
   useEffect(() => {
-    setShowFallback(false);
-    const timer = setTimeout(() => setShowFallback(true), 12000);
-    return () => clearTimeout(timer);
-  }, [embedHandle, embedKey]);
+    let cancelled = false;
+    setLoadState('loading');
+    setSyndicationHtml(null);
+
+    async function load() {
+      // 1. Server-side syndication dene
+      const html = await fetchSyndication(embedHandle);
+      if (cancelled) return;
+
+      if (html) {
+        setSyndicationHtml(html);
+        setLoadState('syndication');
+        return;
+      }
+
+      // 2. Syndication başarısız — iframe embed dene (login olan kullanıcılar için)
+      setLoadState('embed');
+
+      // 15sn sonra hala embed yüklenmediyse fallback göster
+      setTimeout(() => {
+        if (!cancelled) {
+          setLoadState(prev => prev === 'embed' ? 'fallback' : prev);
+        }
+      }, 15000);
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, [embedHandle, embedKey, fetchSyndication]);
+
+  // Syndication HTML'ini iframe'de göster
+  useEffect(() => {
+    if (loadState === 'syndication' && syndicationHtml && iframeRef.current) {
+      const iframe = iframeRef.current;
+      const doc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (doc) {
+        // Syndication HTML'i — tweet kartları içeren tam sayfa
+        const isFullPage = syndicationHtml.includes('<!DOCTYPE') || syndicationHtml.includes('<html');
+
+        if (isFullPage) {
+          doc.open();
+          doc.write(syndicationHtml);
+          doc.close();
+        } else {
+          // oEmbed veya kısmi HTML — wrapper ile sar
+          doc.open();
+          doc.write(`<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: ${theme === 'dark' ? '#1e293b' : '#fff'}; color: ${theme === 'dark' ? '#e2e8f0' : '#1a1a2e'}; font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow-x: hidden; }
+.twitter-timeline { width: 100% !important; }
+</style>
+</head><body>
+${syndicationHtml}
+<script src="https://platform.twitter.com/widgets.js" charset="utf-8" async><\/script>
+</body></html>`);
+          doc.close();
+        }
+      }
+    }
+  }, [loadState, syndicationHtml, theme]);
 
   const currentAccount = FOOTBALL_ACCOUNTS.find(a => a.handle === selectedHandle);
 
@@ -104,7 +178,6 @@ export default function TwitterTimeline({
                 onClick={() => {
                   setSelectedHandle(account.handle);
                   setEmbedKey(prev => prev + 1);
-                  setShowFallback(false);
                 }}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
                   selectedHandle === account.handle
@@ -119,43 +192,45 @@ export default function TwitterTimeline({
         </div>
       )}
 
-      {/* Timeline */}
-      <div style={{ minHeight: compact ? 300 : height }} className="relative">
-        {/* react-twitter-embed component */}
-        <div key={`${embedHandle}-${embedKey}`}>
-          <TwitterTimelineEmbed
-            sourceType="profile"
-            screenName={embedHandle}
-            options={{
-              height: compact ? 300 : height,
-              theme: theme,
-              chrome: 'noheader nofooter noborders',
-              lang: 'tr',
-              dnt: true,
-            }}
-            noHeader
-            noFooter
-            noBorders
-            noScrollbar={false}
-            placeholder={
-              <div className="flex flex-col items-center justify-center text-gray-400 py-12">
-                <div className="w-8 h-8 border-2 border-[#1DA1F2] border-t-transparent rounded-full animate-spin mb-3"></div>
-                <p className="text-sm">Twitter yükleniyor...</p>
-                <p className="text-xs text-gray-600 mt-1">X'e giriş yapılması gerekebilir</p>
-              </div>
-            }
-          />
-        </div>
+      {/* Timeline Content */}
+      <div ref={containerRef} style={{ minHeight: effectiveHeight }} className="relative">
+        {/* Loading State */}
+        {loadState === 'loading' && (
+          <div className="flex flex-col items-center justify-center text-gray-400 py-12" style={{ minHeight: effectiveHeight }}>
+            <div className="w-8 h-8 border-2 border-[#1DA1F2] border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p className="text-sm">Twitter yükleniyor...</p>
+          </div>
+        )}
 
-        {/* Fallback — eğer embed yüklenmezse profil linkleri göster */}
-        {showFallback && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-4 bg-[#1e293b]/95 z-20">
+        {/* Syndication HTML (server-side rendered) */}
+        {loadState === 'syndication' && (
+          <iframe
+            ref={iframeRef}
+            title={`${embedHandle} Twitter Timeline`}
+            style={{ width: '100%', height: effectiveHeight, border: 'none' }}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          />
+        )}
+
+        {/* Embed mode — X widget iframe from twitter-embed.html */}
+        {loadState === 'embed' && (
+          <iframe
+            src={`/twitter-embed.html?handle=${encodeURIComponent(embedHandle)}&theme=${theme}&height=${effectiveHeight}&chrome=noheader%20nofooter`}
+            title={`${embedHandle} Twitter Timeline`}
+            style={{ width: '100%', height: effectiveHeight, border: 'none' }}
+            sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          />
+        )}
+
+        {/* Fallback */}
+        {loadState === 'fallback' && (
+          <div className="flex flex-col items-center justify-center px-4 py-8" style={{ minHeight: effectiveHeight }}>
             <svg viewBox="0 0 24 24" className="w-10 h-10 fill-current text-gray-600 mb-3" aria-hidden="true">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
             </svg>
             <p className="text-gray-300 text-sm mb-1 font-medium">Twitter timeline yüklenemedi</p>
-            <p className="text-gray-500 text-xs mb-4 text-center">
-              X'e tarayıcınızdan giriş yaparsanız tweetler görünür
+            <p className="text-gray-500 text-xs mb-4 text-center max-w-xs">
+              X hesabınızla tarayıcınızdan giriş yaparsanız tweetler otomatik olarak görünecektir
             </p>
             <a
               href={`https://x.com/${embedHandle}`}
