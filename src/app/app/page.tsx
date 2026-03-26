@@ -1207,8 +1207,8 @@ function PlayerModal({
 
       {/* 3-column layout */}
       <div className="flex h-[calc(100vh-88px)]">
-        {/* LEFT: Global Sohbet — hidden on small screens */}
-        <div className="hidden lg:flex w-80 shrink-0 p-2">
+        {/* LEFT: Global Sohbet — hidden on small screens, resizable width */}
+        <div className="hidden lg:flex w-72 xl:w-80 shrink-0 p-2 max-h-[calc(100vh-132px)]">
           <ChatPanel />
         </div>
 
@@ -1726,7 +1726,7 @@ export default function AppPage() {
 
     const fetchVideos = (showLoading = true) => {
       if (showLoading) setLoading(true);
-      getMultiChannelVideos(channelYtIds, apiKey, 3)
+      getMultiChannelVideos(channelYtIds, apiKey, 5)
         .then((result) => {
           setVideos(Array.isArray(result) ? result : []);
         })
