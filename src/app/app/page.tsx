@@ -252,8 +252,8 @@ function MultiViewPlayer({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 shrink-0" style={{ background: 'rgba(17,24,39,0.95)' }}>
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 py-2 border-b border-white/10 shrink-0 gap-2" style={{ background: 'rgba(17,24,39,0.95)' }}>
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <span className="text-lg">📺</span>
           <h2 className="text-sm font-bold text-white">Çoklu İzleme</h2>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium">
@@ -270,7 +270,7 @@ function MultiViewPlayer({
                   : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
               }`}
             >
-              {isFocusMode ? '⊞ Çoklu Ekran' : '⊡ Tek Ekran'}
+              {isFocusMode ? '⊞ Çoklu' : '⊡ Tek'}
             </button>
           )}
 
@@ -283,14 +283,14 @@ function MultiViewPlayer({
                 : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
             }`}
           >
-            {autoDirector ? '🎬 Auto Zap ON' : '🎬 Auto Zap'}
+            {autoDirector ? '🎬 ON' : '🎬 Zap'}
           </button>
 
           <span className="text-[10px] text-gray-600 hidden lg:block">← → geçiş | 1-{videos.length} seç | {videos.length <= 4 ? 'F focus | ' : ''}ESC kapat</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Kanal ses seçici — büyütülmüş */}
-          <div className="hidden sm:flex items-center gap-1 overflow-x-auto max-w-lg">
+          <div className="hidden sm:flex items-center gap-1 overflow-x-auto max-w-xs md:max-w-lg">
             {videos.map((v, i) => (
               <button
                 key={v.id}
@@ -305,18 +305,18 @@ function MultiViewPlayer({
               </button>
             ))}
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500/30 text-white text-sm transition-colors">
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500/30 text-white text-sm transition-colors flex-shrink-0">
             ✕
           </button>
         </div>
       </div>
 
       {/* Sponsor Bar — video altı ticker */}
-      <div className="flex items-center justify-center gap-6 px-4 py-1 shrink-0 border-b border-white/5" style={{ background: 'rgba(17,24,39,0.7)' }}>
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-6 px-4 py-1 shrink-0 border-b border-white/5" style={{ background: 'rgba(17,24,39,0.7)' }}>
         <span className="text-[9px] text-gray-600">SPONSOR</span>
-        <span className="text-[10px] text-emerald-400/80 font-medium">⚡ Bu yayın <strong>Nesine.com</strong> sponsorluğunda</span>
-        <span className="text-[10px] text-gray-600">|</span>
-        <span className="text-[10px] text-orange-400/80 font-medium">📺 Maçlar <strong>beIN SPORTS</strong>&apos;ta</span>
+        <span className="text-[10px] text-emerald-400/80 font-medium text-center">⚡ Bu yayın <strong>Nesine.com</strong> sponsorluğunda</span>
+        <span className="text-[10px] text-gray-600 hidden sm:inline">|</span>
+        <span className="text-[10px] text-orange-400/80 font-medium text-center">📺 Maçlar <strong>beIN SPORTS</strong>&apos;ta</span>
       </div>
 
       {/* 3-Column Layout: Chat | Videos | Ad */}
@@ -515,7 +515,7 @@ function MultiViewPlayer({
               </div>
 
               {/* Alt preview strip — glow efektli, yatay scroll */}
-              <div className="flex gap-1.5 h-24 shrink-0 overflow-x-auto px-1 py-1" style={{ scrollSnapType: 'x mandatory' }}>
+              <div className="flex gap-1.5 h-16 sm:h-24 shrink-0 overflow-x-auto px-1 py-1" style={{ scrollSnapType: 'x mandatory' }}>
                 {videos.map((video, idx) => {
                   const videoId = video.ytVideoId || extractVideoId(video.url);
                   const isFocused = idx === focusIndex;
@@ -1349,7 +1349,7 @@ function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]
             const isSelected = selectedLive.find((v) => v.id === video.id);
             const selectIdx = selectedLive.findIndex((v) => v.id === video.id);
             return (
-              <div key={video.id} className="flex-shrink-0 w-72 relative" style={{ scrollSnapAlign: 'start' }}>
+              <div key={video.id} className="flex-shrink-0 w-64 sm:w-72 relative" style={{ scrollSnapAlign: 'start' }}>
                 <button
                   onClick={() => liveVideos.length >= 2 ? toggleSelect(video) : onSelect(video)}
                   className={`w-full bg-gradient-to-br from-red-950/40 to-[#1e293b] hover:from-red-950/60 rounded-xl overflow-hidden transition-all hover:scale-[1.02] group text-left ${
@@ -1497,6 +1497,11 @@ export default function AppPage() {
   // Pre-roll ad state
   const [showPreroll, setShowPreroll] = useState(false);
   const [pendingVideo, setPendingVideo] = useState<Video | null>(null);
+
+  // Mobile menu states
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileMultiChatOpen, setMobileMultiChatOpen] = useState(false);
 
   // Get current user
   useEffect(() => {
@@ -1790,8 +1795,8 @@ export default function AppPage() {
 
       {/* Multi-Select Floating Bar */}
       {multiSelectVideos.length > 0 && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] animate-slide-up">
-          <div className="bg-[#1a1a2e]/95 backdrop-blur-lg border border-emerald-500/30 rounded-2xl px-4 py-3 shadow-2xl shadow-emerald-500/10 flex items-center gap-3">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] animate-slide-up max-w-[90vw] px-2">
+          <div className="bg-[#1a1a2e]/95 backdrop-blur-lg border border-emerald-500/30 rounded-2xl px-4 py-3 shadow-2xl shadow-emerald-500/10 flex items-center gap-3 overflow-x-auto">
             {/* Selected thumbnails */}
             <div className="flex -space-x-2">
               {multiSelectVideos.map((v, i) => (
@@ -1844,7 +1849,7 @@ export default function AppPage() {
                 </h1>
               </div>
             </div>
-            <nav className="flex items-center gap-1 ml-2">
+            <nav className="hidden md:flex items-center gap-1 ml-2">
               <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400">
                 📺 Ana Sayfa
               </span>
@@ -1867,28 +1872,64 @@ export default function AppPage() {
                 ⚙ Admin
               </Link>
             </nav>
+            {/* Mobile hamburger button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+            >
+              <span className="text-lg">{mobileMenuOpen ? '✕' : '☰'}</span>
+            </button>
           </div>
           <div className="flex items-center gap-3">
             {liveVideos.length > 0 && (
-              <span className="flex items-center gap-1.5 text-xs text-red-400">
+              <span className="hidden sm:flex items-center gap-1.5 text-xs text-red-400">
                 <span className="w-2 h-2 rounded-full bg-red-500 live-pulse"></span>
                 {liveVideos.length} Canlı
               </span>
             )}
             {(selectedTeam || selectedContentType) && (
-              <button onClick={handleReset} className="text-xs px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-gray-400">
+              <button onClick={handleReset} className="hidden sm:block text-xs px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-gray-400">
                 Sıfırla
               </button>
             )}
             <ProfileMenu user={user} />
           </div>
         </div>
+
+        {/* Mobile Menu Overlay */}
+        {mobileMenuOpen && (
+          <div className="md:hidden animate-menu-fade border-t border-white/5" style={{ background: 'rgba(15,23,36,0.95)' }}>
+            <nav className="flex flex-col px-4 py-3 space-y-2">
+              <Link href="/app" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium bg-emerald-500/15 text-emerald-400 transition-colors">
+                📺 Ana Sayfa
+              </Link>
+              <Link href="/app/matches" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                ⚽ Maçlar
+              </Link>
+              <Link href="/app/chat" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                💬 Sohbet
+              </Link>
+              <Link href="/app/twitter" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                🐦 Twitter
+              </Link>
+              <Link href="/app/channels" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                📡 Kanallar
+              </Link>
+              <Link href="/app/stats" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                📊 Reyting
+              </Link>
+              <Link href="/app/admin" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-red-400 transition-colors">
+                ⚙ Admin
+              </Link>
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* MAIN CONTENT WITH SIDEBAR */}
       <div className="max-w-7xl mx-auto px-4 mt-6 flex gap-6">
-        {/* Left: Main Content */}
-        <div className="flex-1 min-w-0">
+        {/* Left: Main Content (Full width on mobile) */}
+        <div className="flex-1 min-w-0 pb-20 md:pb-0">
           {/* Hero */}
           {!selectedTeam && !selectedContentType && (
             <div className="text-center mb-8 animate-slide-up">
@@ -2122,6 +2163,50 @@ export default function AppPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile Sidebar FAB + Drawer (visible only on mobile/tablet) */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden" style={{ background: 'rgba(0,0,0,0.4)' }} onClick={() => setMobileSidebarOpen(false)}>
+          <div className="fixed bottom-0 left-0 right-0 z-50 animate-drawer-up max-h-[80vh] flex flex-col rounded-t-2xl border-t border-white/10" style={{ background: 'rgba(17,24,39,0.98)' }}>
+            {/* Drawer Handle */}
+            <div className="flex justify-center pt-3 pb-2 shrink-0">
+              <div className="w-12 h-1 rounded-full bg-white/30"></div>
+            </div>
+
+            {/* Drawer Header */}
+            <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between shrink-0">
+              <h3 className="text-sm font-bold text-white">⚽ Bilgiler & Sohbet</h3>
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="w-6 h-6 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Drawer Content - Scrollable */}
+            <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
+              <SponsorSidebar />
+              <ChatPanel />
+              <TwitterFeedWidget />
+              <LiveScoreWidget />
+              <FixturesWidget />
+              <StandingsWidget />
+              <UserProfileWidget />
+              <PollWidget />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Sidebar FAB Button */}
+      <button
+        onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+        className="fixed bottom-20 right-4 z-40 lg:hidden w-12 h-12 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xl transition-all active:scale-95 shadow-lg"
+        title="Bilgileri aç/kapat"
+      >
+        ⚽
+      </button>
 
       {/* ZAP BAR — Fixed bottom */}
       <ZapBar
