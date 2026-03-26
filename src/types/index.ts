@@ -33,6 +33,7 @@ export interface Video {
   publishedAt: string;
   viewCount?: string;
   duration?: string;
+  durationSeconds?: number; // ham saniye — Shorts tespiti için
   url: string;
   ytVideoId?: string;
   live?: boolean;

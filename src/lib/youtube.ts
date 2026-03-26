@@ -180,6 +180,7 @@ async function fetchChannelUploads(
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
       const isLive = item.snippet?.liveBroadcastContent === 'live';
+      const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
         title: item.snippet.title,
@@ -193,15 +194,21 @@ async function fetchChannelUploads(
         viewCount: isLive
           ? item.liveStreamingDetails?.concurrentViewers || item.statistics?.viewCount
           : item.statistics?.viewCount,
-        duration: isLive ? 'CANLI' : parseDuration(item.contentDetails?.duration),
+        duration: isLive ? 'CANLI' : dur.formatted,
+        durationSeconds: isLive ? 0 : dur.seconds,
         url: `https://www.youtube.com/watch?v=${item.id}`,
         ytVideoId: item.id,
         live: isLive,
       };
     });
 
-    // Cache for 6 hours in both L1 + L2 — kota tasarrufu
-    await setCache(cacheKey, videos, 6);
+    // Saate göre akıllı cache — gündüz videolar sık yükleniyor
+    // 02-10: 6 saat  — kimse video yüklemez
+    // 10-17: 2 saat  — gündüz video yükleme aktif (Vole, Neo, 343 vb.)
+    // 17-02: 1 saat  — akşam da yeni videolar gelebilir
+    const uploadHour = new Date().getHours();
+    const uploadCacheTTL = (uploadHour >= 2 && uploadHour < 10) ? 6 : (uploadHour >= 10 && uploadHour < 17) ? 2 : 1;
+    await setCache(cacheKey, videos, uploadCacheTTL);
     return videos;
   } catch (error) {
     console.error('fetchChannelUploads error:', error);
@@ -261,6 +268,7 @@ export async function searchChannelVideos(
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
       const isLive = item.snippet?.liveBroadcastContent === 'live';
+      const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
         title: item.snippet.title,
@@ -274,7 +282,8 @@ export async function searchChannelVideos(
         viewCount: isLive
           ? item.liveStreamingDetails?.concurrentViewers || item.statistics?.viewCount
           : item.statistics?.viewCount,
-        duration: isLive ? 'CANLI' : parseDuration(item.contentDetails?.duration),
+        duration: isLive ? 'CANLI' : dur.formatted,
+        durationSeconds: isLive ? 0 : dur.seconds,
         url: `https://www.youtube.com/watch?v=${item.id}`,
         ytVideoId: item.id,
         live: isLive,
@@ -292,9 +301,25 @@ export async function searchChannelVideos(
 
 // =============================================
 // ⚡ LIVE STREAM DETECTION — KOTA DOSTU!
-// Tek bir search çağrısı (100 birim) + 5 dk cache
+// Tek bir search çağrısı (100 birim) + saate göre akıllı cache
 // 16 kanal için 16x100=1600 yerine sadece 100 birim!
+//
+// Cache süreleri (saat cinsinden):
+// 02-10: 2 saat    — kimse yayın yapmaz
+// 10-12: 0.5 saat  — nadir yayın
+// 12-17: 0.25 saat — bazı kanallar başlar
+// 17-20: 0.08 saat (~5dk) — maç öncesi yoğunluk
+// 20-02: 0.05 saat (~3dk) — pik saat
 // =============================================
+function getLiveCacheTTL(): number {
+  const hour = new Date().getHours();
+  if (hour >= 2 && hour < 10) return 2;       // 2 saat — ölü saat
+  if (hour >= 10 && hour < 12) return 0.5;     // 30 dk — nadir
+  if (hour >= 12 && hour < 17) return 0.25;    // 15 dk — öğlen
+  if (hour >= 17 && hour < 20) return 5 / 60;  // 5 dk — maç öncesi
+  return 3 / 60;                                // 3 dk — pik saat (20-02)
+}
+
 async function fetchLiveStreams(
   channelIds: string[],
   apiKey: string
@@ -320,9 +345,10 @@ async function fetchLiveStreams(
     if (!res.ok) return [];
     const data = await res.json();
     const items = data.items || [];
+    const cacheTTL = getLiveCacheTTL();
     if (items.length === 0) {
-      // Cache empty result for 5 min too (don't keep checking)
-      await setCache(cacheKey, [], 0.25);
+      // Boş sonucu da cache'le — gereksiz tekrar sorgu yapma
+      await setCache(cacheKey, [], cacheTTL);
       return [];
     }
 
@@ -333,7 +359,7 @@ async function fetchLiveStreams(
     );
 
     if (ourItems.length === 0) {
-      await setCache(cacheKey, [], 0.25);
+      await setCache(cacheKey, [], cacheTTL);
       return [];
     }
 
@@ -368,8 +394,8 @@ async function fetchLiveStreams(
       live: true,
     }));
 
-    // Cache 15 dakika — günde max ~96 kontrol = ~9600 birim
-    await setCache(cacheKey, liveVideos, 0.25);
+    // Akıllı cache — saate göre değişir (3dk pik, 2 saat gece)
+    await setCache(cacheKey, liveVideos, cacheTTL);
     return liveVideos;
   } catch (error) {
     console.error('fetchLiveStreams error:', error);
@@ -425,9 +451,13 @@ export async function getMultiChannelVideos(
     return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
   });
 
-  // Multi-channel cache: 3 minutes if any live, 6 hours if no live
+  // Akıllı multi-channel cache
+  // Canlı varsa: live cache TTL (3dk pik, 5dk akşam vb.)
+  // Canlı yoksa: upload cache TTL (2 saat gündüz, 6 saat gece)
   const hasLive = sorted.some(v => v.live);
-  await setCache(cacheKey, sorted, hasLive ? 0.25 : 6);
+  const multiHour = new Date().getHours();
+  const noLiveTTL = (multiHour >= 2 && multiHour < 10) ? 6 : (multiHour >= 10 && multiHour < 17) ? 2 : 1;
+  await setCache(cacheKey, sorted, hasLive ? getLiveCacheTTL() : noLiveTTL);
   return sorted;
 }
 
@@ -506,16 +536,21 @@ export async function getChannelStats(
 // =============================================
 // HELPERS
 // =============================================
-function parseDuration(isoDuration?: string): string {
-  if (!isoDuration) return '';
+function parseDuration(isoDuration?: string): { formatted: string; seconds: number } {
+  if (!isoDuration) return { formatted: '', seconds: 0 };
   const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-  if (!match) return '';
+  if (!match) return { formatted: '', seconds: 0 };
 
-  const hours = match[1] ? `${match[1]}:` : '';
-  const minutes = match[2] ? match[2].padStart(hours ? 2 : 1, '0') : '0';
-  const seconds = match[3] ? match[3].padStart(2, '0') : '00';
+  const h = parseInt(match[1] || '0');
+  const m = parseInt(match[2] || '0');
+  const s = parseInt(match[3] || '0');
+  const totalSeconds = h * 3600 + m * 60 + s;
 
-  return `${hours}${minutes}:${seconds}`;
+  const hours = h ? `${h}:` : '';
+  const minutes = String(m).padStart(hours ? 2 : 1, '0');
+  const seconds2 = String(s).padStart(2, '0');
+
+  return { formatted: `${hours}${minutes}:${seconds2}`, seconds: totalSeconds };
 }
 
 export function formatViewCount(count?: string): string {

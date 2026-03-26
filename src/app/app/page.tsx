@@ -1045,6 +1045,63 @@ function SponsorSidebar() {
 }
 
 // =============================================
+// LIVE EMPTY STATE — time-aware messaging
+// =============================================
+function LiveEmptyState() {
+  const hour = new Date().getHours();
+
+  // Gerçek yayın paternine göre mesajlar
+  // 02-10: ölü saat — kimse yayın yapmaz
+  // 10-12: nadir — ara sıra erken yayın olabilir
+  // 12-17: öğlen — bazı kanallar başlar
+  // 17-20: yoğunlaşma — maç öncesi
+  // 20-02: pik — maçlar + post-maç
+  let emoji: string, message: string, subMessage: string, checkInfo: string;
+
+  if (hour >= 2 && hour < 10) {
+    emoji = '🌙';
+    message = 'Yayıncılar şu an uyuyor';
+    subMessage = 'Öğleden sonra yayınlar başlayacak';
+    checkInfo = '2 saatte bir kontrol ediliyor';
+  } else if (hour >= 10 && hour < 12) {
+    emoji = '☀️';
+    message = 'Henüz yayın başlamadı';
+    subMessage = 'Bazı kanallar öğlen saatlerinde yayına başlıyor';
+    checkInfo = '30 dakikada bir kontrol ediliyor';
+  } else if (hour >= 12 && hour < 17) {
+    emoji = '📡';
+    message = 'Yayınlar kontrol ediliyor';
+    subMessage = 'Kanallar canlıya geçtiğinde otomatik görünecek';
+    checkInfo = '15 dakikada bir kontrol ediliyor';
+  } else if (hour >= 17 && hour < 20) {
+    emoji = '📺';
+    message = 'Yayınlar yakında başlayacak';
+    subMessage = 'Maç saati yaklaşıyor, kanallar hazırlanıyor';
+    checkInfo = '5 dakikada bir kontrol ediliyor';
+  } else {
+    // 20-02 pik saat
+    emoji = '📺';
+    message = 'Yayınlar yakında başlayacak';
+    subMessage = 'Kanallar kontrol ediliyor, canlı yayın başladığında otomatik görünecek';
+    checkInfo = '3 dakikada bir kontrol ediliyor';
+  }
+
+  return (
+    <div className="bg-[#1e293b] rounded-xl border border-white/5 p-4 text-center">
+      <div className="flex items-center justify-center gap-2">
+        <span className="text-lg opacity-50">{emoji}</span>
+        <p className="text-sm text-gray-400 font-medium">{message}</p>
+      </div>
+      <p className="text-xs text-gray-600 mt-1">{subMessage}</p>
+      <div className="flex items-center justify-center gap-2 mt-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50 animate-pulse"></span>
+        <span className="text-[10px] text-gray-600">{checkInfo}</span>
+      </div>
+    </div>
+  );
+}
+
+// =============================================
 // LIVE BANNER
 // =============================================
 function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]; onSelect: (v: Video) => void; onMultiView: (videos: Video[]) => void }) {
@@ -1081,15 +1138,7 @@ function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]
       </div>
 
       {liveVideos.length === 0 ? (
-        <div className="bg-[#1e293b] rounded-xl border border-white/5 p-6 text-center">
-          <div className="text-3xl mb-2 opacity-40">📡</div>
-          <p className="text-sm text-gray-400 font-medium">Şu an canlı yayın yok</p>
-          <p className="text-xs text-gray-600 mt-1">Takip ettiğin kanallardan biri canlıya geçtiğinde burada görünecek</p>
-          <div className="flex items-center justify-center gap-2 mt-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
-            <span className="text-[10px] text-gray-600">Kanallar kontrol ediliyor...</span>
-          </div>
-        </div>
+        <LiveEmptyState />
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollSnapType: 'x mandatory' }}>
           {liveVideos.map((video) => (
@@ -1229,7 +1278,7 @@ export default function AppPage() {
     });
   }, [selectedTeam, selectedContentType]);
 
-  // Fetch real videos from YouTube API (no mock fallback)
+  // Fetch real videos from YouTube API + poll every 3 minutes for live streams
   useEffect(() => {
     if (filteredChannels.length === 0) {
       setVideos([]);
@@ -1245,15 +1294,49 @@ export default function AppPage() {
       return;
     }
 
-    setLoading(true);
-    getMultiChannelVideos(channelYtIds, apiKey, 3)
-      .then((result) => {
-        setVideos(Array.isArray(result) ? result : []);
-      })
-      .catch(() => {
-        setVideos([]);
-      })
-      .finally(() => setLoading(false));
+    const fetchVideos = (showLoading = true) => {
+      if (showLoading) setLoading(true);
+      getMultiChannelVideos(channelYtIds, apiKey, 3)
+        .then((result) => {
+          setVideos(Array.isArray(result) ? result : []);
+        })
+        .catch(() => {
+          setVideos([]);
+        })
+        .finally(() => { if (showLoading) setLoading(false); });
+    };
+
+    // Initial fetch
+    fetchVideos(true);
+
+    // Smart polling: gerçek yayın paternine göre kota dostu aralıklar
+    // Server-side cache zaten koruma sağlıyor (canlı yoksa saatlerce cache)
+    //
+    // Türk futbol yayın paterni:
+    // 02:00-10:00 → Kimse yayın yapmaz              → 2 saatte 1
+    // 10:00-12:00 → Çok nadir, ara sıra erken yayın → 30 dk
+    // 12:00-17:00 → Bazı kanallar başlar             → 15 dk
+    // 17:00-20:00 → Yayınlar yoğunlaşır, maç öncesi → 5 dk
+    // 20:00-02:00 → Pik saat, maçlar + post-maç     → 3 dk
+    const getSmartInterval = () => {
+      const hour = new Date().getHours();
+      if (hour >= 2 && hour < 10) return 120 * 60 * 1000;  // 2 saat — ölü saat
+      if (hour >= 10 && hour < 12) return 30 * 60 * 1000;   // 30 dk — nadir yayın
+      if (hour >= 12 && hour < 17) return 15 * 60 * 1000;   // 15 dk — öğlen yayınları
+      if (hour >= 17 && hour < 20) return 5 * 60 * 1000;    // 5 dk — maç öncesi
+      return 3 * 60 * 1000;                                  // 3 dk — pik saat (20-02)
+    };
+
+    let pollTimer: ReturnType<typeof setTimeout>;
+    const schedulePoll = () => {
+      pollTimer = setTimeout(() => {
+        fetchVideos(false);
+        schedulePoll(); // Tekrar planla (her seferinde saati kontrol eder)
+      }, getSmartInterval());
+    };
+    schedulePoll();
+
+    return () => clearTimeout(pollTimer);
   }, [filteredChannels]);
 
   // TV MODE: Auto-open first live stream (or latest video) when page loads
@@ -1278,15 +1361,24 @@ export default function AppPage() {
     return () => clearTimeout(timer);
   }, [videos, tvBooted, activeVideo]);
 
-  // Separate live and regular videos
+  // Separate live, regular, and shorts videos
+  const SHORTS_THRESHOLD = 90; // 90 saniyeden kısa = Shorts
   const liveVideos = useMemo(() => videos.filter((v) => v.live), [videos]);
   const regularVideos = useMemo(
-    () => videos.filter((v) => !v.live).sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
+    () => videos
+      .filter((v) => !v.live && (!v.durationSeconds || v.durationSeconds >= SHORTS_THRESHOLD))
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
+    [videos]
+  );
+  const shortsVideos = useMemo(
+    () => videos
+      .filter((v) => !v.live && v.durationSeconds && v.durationSeconds > 0 && v.durationSeconds < SHORTS_THRESHOLD)
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
     [videos]
   );
 
-  // All videos for zap navigation
-  const allVideos = useMemo(() => [...liveVideos, ...regularVideos], [liveVideos, regularVideos]);
+  // All videos for zap navigation (shorts dahil)
+  const allVideos = useMemo(() => [...liveVideos, ...regularVideos, ...shortsVideos], [liveVideos, regularVideos, shortsVideos]);
 
   // ZAP function — switch between videos
   const handleZap = useCallback(
@@ -1647,6 +1739,46 @@ export default function AppPage() {
               </div>
             )}
           </section>
+
+          {/* SHORTS SECTION — kısa videolar */}
+          {shortsVideos.length > 0 && (
+            <section className="mt-6 animate-slide-up">
+              <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
+                <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-1.5 py-0.5 rounded">SHORTS</span>
+                Kısa Videolar
+                <span className="text-xs text-gray-600">({shortsVideos.length})</span>
+              </h3>
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollSnapType: 'x mandatory' }}>
+                {shortsVideos.map((video) => (
+                  <button
+                    key={video.id}
+                    onClick={() => setActiveVideo(video)}
+                    className="flex-shrink-0 w-36 group text-left"
+                    style={{ scrollSnapAlign: 'start' }}
+                  >
+                    <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-gray-800 mb-1.5">
+                      {video.thumbnail ? (
+                        <img src={video.thumbnail} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-800" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                      <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-mono">
+                        {video.duration}
+                      </div>
+                      <div className="absolute top-1.5 left-1.5 bg-red-500/90 text-white text-[9px] px-1 py-0.5 rounded font-bold">
+                        SHORTS
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-300 font-medium line-clamp-2 group-hover:text-white transition-colors leading-tight">
+                      {video.title}
+                    </p>
+                    <p className="text-[10px] text-gray-600 mt-0.5 truncate">{video.channelTitle}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Right: Sidebar (hidden on mobile) */}
