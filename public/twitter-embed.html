@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Twitter Timeline</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: transparent; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  body.dark { background: #1e293b; color: #e2e8f0; }
+  body.light { background: #ffffff; color: #1a1a2e; }
+  #timeline-container { width: 100%; min-height: 100vh; }
+  .loading {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100vh; gap: 12px;
+  }
+  .loading .spinner {
+    width: 32px; height: 32px; border: 2px solid #1DA1F2;
+    border-top-color: transparent; border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading p { font-size: 13px; opacity: 0.6; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100vh; gap: 12px; padding: 20px; text-align: center;
+  }
+  .error a {
+    color: #1DA1F2; text-decoration: none; font-size: 14px;
+    padding: 8px 16px; border: 1px solid #1DA1F2; border-radius: 20px;
+  }
+  .error a:hover { background: #1DA1F2; color: white; }
+  /* Hide Twitter's default chrome for cleaner embed */
+  .twitter-timeline { width: 100% !important; }
+</style>
+</head>
+<body class="dark">
+<div id="timeline-container">
+  <div class="loading" id="loading-state">
+    <div class="spinner"></div>
+    <p>Twitter yükleniyor...</p>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Parse URL parameters
+  var params = new URLSearchParams(window.location.search);
+  var handle = params.get('handle') || 'GalatasaraySK';
+  var theme = params.get('theme') || 'dark';
+  var h = params.get('height') || '600';
+  var listUrl = params.get('list') || '';
+  var chrome = params.get('chrome') || 'noheader nofooter';
+
+  document.body.className = theme;
+
+  var container = document.getElementById('timeline-container');
+  var loadingEl = document.getElementById('loading-state');
+
+  // Build the anchor element
+  var url = listUrl || ('https://twitter.com/' + handle);
+  var anchor = document.createElement('a');
+  anchor.className = 'twitter-timeline';
+  anchor.setAttribute('data-height', h);
+  anchor.setAttribute('data-theme', theme);
+  anchor.setAttribute('data-chrome', chrome);
+  anchor.setAttribute('data-lang', 'tr');
+  anchor.setAttribute('data-dnt', 'true');
+  anchor.href = url + '?ref_src=twsrc%5Etfw';
+  anchor.textContent = '@' + handle + ' tweetleri yükleniyor...';
+
+  // Insert anchor before loading indicator
+  container.insertBefore(anchor, loadingEl);
+
+  // Load widgets.js
+  var script = document.createElement('script');
+  script.src = 'https://platform.twitter.com/widgets.js';
+  script.async = true;
+  script.charset = 'utf-8';
+
+  script.onload = function() {
+    // Wait for twttr to be ready
+    var checkReady = setInterval(function() {
+      if (window.twttr && window.twttr.widgets) {
+        clearInterval(checkReady);
+        window.twttr.widgets.load(container);
+
+        // Listen for rendered event
+        window.twttr.events.bind('rendered', function(event) {
+          if (loadingEl) loadingEl.style.display = 'none';
+          // Notify parent about content height
+          try {
+            window.parent.postMessage({ type: 'twitter-loaded', height: document.body.scrollHeight }, '*');
+          } catch(e) {}
+        });
+
+        // Fallback timeout
+        setTimeout(function() {
+          var iframe = container.querySelector('iframe');
+          if (iframe) {
+            if (loadingEl) loadingEl.style.display = 'none';
+          } else {
+            showError();
+          }
+        }, 10000);
+      }
+    }, 100);
+
+    setTimeout(function() { clearInterval(checkReady); }, 12000);
+  };
+
+  script.onerror = function() { showError(); };
+  document.body.appendChild(script);
+
+  function showError() {
+    if (loadingEl) loadingEl.style.display = 'none';
+    var errorDiv = document.createElement('div');
+    errorDiv.className = 'error';
+    errorDiv.innerHTML = '<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" style="opacity:0.4"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>' +
+      '<p style="opacity:0.5;font-size:13px">Twitter embed yüklenemedi</p>' +
+      '<a href="https://x.com/' + handle + '" target="_blank">@' + handle + ' profilini aç ↗</a>';
+    container.appendChild(errorDiv);
+  }
+})();
+</script>
+</body>
+</html>
