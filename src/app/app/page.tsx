@@ -1208,14 +1208,14 @@ function PlayerModal({
       {/* 3-column layout — header 44px + zap bar 44px = 88px */}
       <div className="flex h-[calc(100vh-88px)] overflow-hidden">
         {/* LEFT: Global Sohbet — hidden on small screens */}
-        <div className="hidden lg:flex w-72 xl:w-80 shrink-0 p-2 overflow-hidden">
+        <div className="hidden lg:flex w-72 xl:w-80 shrink-0 p-1 overflow-hidden">
           <ChatPanel />
         </div>
 
         {/* CENTER: Main Player */}
-        <div className="flex-1 flex flex-col min-w-0 p-2">
+        <div className="flex-1 flex flex-col min-w-0 px-1 py-1">
           {/* Video Title Bar */}
-          <div className="bg-[#111827] rounded-t-xl px-4 py-2.5 border border-white/10 border-b-0 flex items-center justify-between">
+          <div className="bg-[#111827] rounded-t-xl px-3 py-2 border border-white/10 border-b-0 flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
               {video.live && (
                 <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold shrink-0">
@@ -1278,7 +1278,7 @@ function PlayerModal({
             )}
           </div>
           {/* Autoplay Next Toggle */}
-          <div className="flex items-center justify-between bg-[#111827] rounded-xl px-3 py-1.5 mt-1 border border-white/5">
+          <div className="flex items-center justify-between bg-[#111827] rounded-lg px-2.5 py-1 mt-0.5 border border-white/5">
             <div className="flex items-center gap-2">
               <span className="text-sm">🔄</span>
               <span className="text-[11px] text-gray-400">Otomatik Sonraki Video</span>
@@ -1295,7 +1295,7 @@ function PlayerModal({
         </div>
 
         {/* RIGHT: Betting + Featured Channels — hidden on small screens */}
-        <div className="hidden md:flex flex-col w-64 shrink-0 p-2 gap-2 overflow-y-auto">
+        <div className="hidden md:flex flex-col w-56 xl:w-60 shrink-0 p-1 gap-1.5 overflow-y-auto">
           {/* Canlı Bahis Card */}
           <div className="bg-gradient-to-br from-[#1a2332] to-[#1e293b] rounded-xl border border-yellow-500/30 overflow-hidden">
             <div className="px-3 py-2 bg-yellow-500/20 border-b border-yellow-500/30">
