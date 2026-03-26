@@ -485,7 +485,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   // Misafirler mesajları görebilir ama yazamaz — aşağıda input yerine üye ol CTA gösterilir
 
   return (
-    <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10 relative h-full max-h-[calc(100vh-140px)]">
+    <div className="flex flex-col bg-[#1a1a2e] rounded-xl border border-white/10 relative h-full min-h-0 overflow-hidden">
       {/* Header */}
       <div className="p-3 border-b border-white/10 bg-[#16162a] rounded-t-xl flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 min-w-0">

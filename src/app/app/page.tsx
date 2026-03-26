@@ -1205,10 +1205,10 @@ function PlayerModal({
         </div>
       </header>
 
-      {/* 3-column layout */}
-      <div className="flex h-[calc(100vh-88px)]">
-        {/* LEFT: Global Sohbet — hidden on small screens, resizable width */}
-        <div className="hidden lg:flex w-72 xl:w-80 shrink-0 p-2 max-h-[calc(100vh-132px)]">
+      {/* 3-column layout — header 44px + zap bar 44px = 88px */}
+      <div className="flex h-[calc(100vh-88px)] overflow-hidden">
+        {/* LEFT: Global Sohbet — hidden on small screens */}
+        <div className="hidden lg:flex w-72 xl:w-80 shrink-0 p-2 overflow-hidden">
           <ChatPanel />
         </div>
 
