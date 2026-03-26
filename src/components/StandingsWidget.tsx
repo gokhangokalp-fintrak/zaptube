@@ -8,7 +8,7 @@ interface StandingsWidgetProps {
 }
 
 export default function StandingsWidget({ selectedTeamId }: StandingsWidgetProps) {
-  const { data: standings, loading, isRealData } = useSportsData<TeamStanding[]>({
+  const { data: standings, loading, error } = useSportsData<TeamStanding[]>({
     type: 'standings',
   });
 
@@ -30,6 +30,20 @@ export default function StandingsWidget({ selectedTeamId }: StandingsWidgetProps
     );
   }
 
+  if (error || !standings || standings.length === 0) {
+    return (
+      <div className="bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a3e]">
+        <h2 className="text-lg font-bold text-white mb-1">🏆 Puan Durumu</h2>
+        <div className="h-48 flex items-center justify-center">
+          <div className="text-center text-gray-400">
+            <p className="text-sm">Puan durumu şu an yüklenemiyor</p>
+            <p className="text-xs mt-1">API kotası dolmuş olabilir, kısa süre içinde güncellenir</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a3e] overflow-hidden flex flex-col h-full">
       {/* Header */}
@@ -37,7 +51,7 @@ export default function StandingsWidget({ selectedTeamId }: StandingsWidgetProps
         <h2 className="text-lg font-bold text-white mb-1">🏆 Puan Durumu</h2>
         <p className="text-xs text-gray-400">
           Süper Lig 2025-26
-          {isRealData && <span className="ml-2 text-green-400 text-[8px]">● CANLI</span>}
+          <span className="ml-2 text-green-400 text-[8px]">● CANLI</span>
         </p>
       </div>
 

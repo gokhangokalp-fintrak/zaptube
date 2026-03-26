@@ -11,7 +11,7 @@ interface GroupedMatches {
 type TabType = 'upcoming' | 'finished';
 
 export default function FixturesWidget() {
-  const { data: matches, loading } = useSportsData<Match[]>({
+  const { data: matches, loading, error } = useSportsData<Match[]>({
     type: 'fixtures',
   });
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
@@ -36,6 +36,20 @@ export default function FixturesWidget() {
       <div className="bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a3e]">
         <div className="h-64 flex items-center justify-center">
           <div className="text-gray-400">Yükleniyor...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || allMatches.length === 0) {
+    return (
+      <div className="bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a3e]">
+        <h2 className="text-lg font-bold text-white mb-1">📅 Fikstür</h2>
+        <div className="h-48 flex items-center justify-center">
+          <div className="text-center text-gray-400">
+            <p className="text-sm">Fikstür şu an yüklenemiyor</p>
+            <p className="text-xs mt-1">API kotası dolmuş olabilir, kısa süre içinde güncellenir</p>
+          </div>
         </div>
       </div>
     );

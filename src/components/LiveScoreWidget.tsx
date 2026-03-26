@@ -16,7 +16,7 @@ interface LiveMatch {
 }
 
 export default function LiveScoreWidget() {
-  const { data: matches, loading, isRealData } = useSportsData<LiveMatch[]>({
+  const { data: matches, loading } = useSportsData<LiveMatch[]>({
     type: 'live',
     refreshInterval: 120000, // 2 dakikada bir yenile
   });
@@ -33,7 +33,7 @@ export default function LiveScoreWidget() {
         <div className="flex items-center gap-2">
           <span className="text-lg">⚽</span>
           <h3 className="text-sm font-bold text-white">Canlı Skorlar</h3>
-          {isRealData && (
+          {liveCount > 0 && (
             <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 font-bold">CANLI</span>
           )}
         </div>
@@ -128,7 +128,7 @@ export default function LiveScoreWidget() {
       {/* Footer */}
       <div className="px-4 py-2 border-t border-white/10 bg-white/[0.02]">
         <p className="text-[10px] text-gray-600 text-center">
-          {isRealData ? 'API-Football · Her 2 dk güncellenir' : 'Maç günü canlı skorlar burada'}
+{'API-Football · Her 2 dk güncellenir'}
         </p>
       </div>
     </div>

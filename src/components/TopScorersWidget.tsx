@@ -6,7 +6,7 @@ import { useSportsData } from '@/lib/use-sports-data';
 const MEDAL_EMOJIS = ['🥇', '🥈', '🥉'];
 
 export default function TopScorersWidget() {
-  const { data: allScorers, loading, isRealData } = useSportsData<TopScorer[]>({
+  const { data: allScorers, loading, error } = useSportsData<TopScorer[]>({
     type: 'scorers',
   });
   const scorers = (Array.isArray(allScorers) ? allScorers : []).slice(0, 10);
@@ -16,6 +16,20 @@ export default function TopScorersWidget() {
       <div className="bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a3e]">
         <div className="h-64 flex items-center justify-center">
           <div className="text-gray-400">Yükleniyor...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || scorers.length === 0) {
+    return (
+      <div className="bg-[#1a1a2e] rounded-lg p-4 border border-[#2a2a3e]">
+        <h2 className="text-lg font-bold text-white mb-1">⚽ Gol Krallığı</h2>
+        <div className="h-48 flex items-center justify-center">
+          <div className="text-center text-gray-400">
+            <p className="text-sm">Gol krallığı şu an yüklenemiyor</p>
+            <p className="text-xs mt-1">API kotası dolmuş olabilir, kısa süre içinde güncellenir</p>
+          </div>
         </div>
       </div>
     );
