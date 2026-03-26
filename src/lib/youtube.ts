@@ -12,14 +12,14 @@ const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
 // L1: In-memory cache
 const videoCache = new Map<string, { data: Video[]; timestamp: number }>();
-const VIDEO_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+const VIDEO_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours — kota tasarrufu
 
 // Uploads playlist ID cache (UC→UU conversion, NO API call needed!)
 const uploadsPlaylistCache = new Map<string, string>();
 
 // Channel stats cache
 const statsCache = new Map<string, { data: ChannelStats[]; timestamp: number }>();
-const STATS_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+const STATS_CACHE_TTL = 8 * 60 * 60 * 1000; // 8 hours — kota tasarrufu
 
 // =============================================
 // L1: IN-MEMORY CACHE HELPERS
@@ -200,8 +200,8 @@ async function fetchChannelUploads(
       };
     });
 
-    // Cache for 2 hours in both L1 + L2
-    await setCache(cacheKey, videos, 2);
+    // Cache for 6 hours in both L1 + L2 — kota tasarrufu
+    await setCache(cacheKey, videos, 6);
     return videos;
   } catch (error) {
     console.error('fetchChannelUploads error:', error);
@@ -318,8 +318,8 @@ export async function getMultiChannelVideos(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
 
-  // Multi-channel cache: 2 hours
-  await setCache(cacheKey, sorted, 2);
+  // Multi-channel cache: 6 hours — kota tasarrufu
+  await setCache(cacheKey, sorted, 6);
   return sorted;
 }
 
@@ -376,13 +376,13 @@ export async function getChannelStats(
     // L1 cache
     statsCache.set(cacheKey, { data: stats, timestamp: Date.now() });
 
-    // L2 cache (4 hours) — fire-and-forget
+    // L2 cache (12 hours) — fire-and-forget, kota tasarrufu
     try {
       const supabase2 = createClient();
       await supabase2.rpc('set_video_cache', {
         p_key: cacheKey,
-        p_data: JSON.stringify(stats),
-        p_ttl_hours: 4,
+        p_data: stats,
+        p_ttl_hours: 12,
       });
     } catch {
       // Cache write failed, not critical
