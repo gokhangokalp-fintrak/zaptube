@@ -111,10 +111,19 @@ function MultiViewPlayer({
   onClose: () => void;
   onRemoveVideo: (idx: number) => void;
 }) {
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState([
+    { user: 'Emre1905', msg: '4 kanal aynı anda, efsane! 🔥', avatar: '🦁', time: '21:30' },
+    { user: 'Fener41', msg: 'Hangi kanalda daha güzel analiz var?', avatar: '🐤', time: '21:31' },
+    { user: 'Arda34', msg: 'Ses geçişi çok iyi çalışıyor', avatar: '🦅', time: '21:32' },
+  ]);
+
   // Keyboard navigation — ok tuşlarıyla ses geçişi, ESC ile kapat
   useEffect(() => {
     if (videos.length === 0) return;
     const handler = (e: KeyboardEvent) => {
+      // Chat input'taysa ok tuşlarını engelleme
+      if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return;
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -138,92 +147,239 @@ function MultiViewPlayer({
 
   if (videos.length === 0) return null;
 
-  // Grid layout — 1: full, 2: 2 sütun, 3: 2+1, 4: 2x2
-  const gridClass =
-    videos.length === 1 ? 'grid-cols-1' :
-    videos.length === 3 ? 'grid-cols-2' :
-    'grid-cols-2';
-  const gridRows =
-    videos.length <= 2 ? 'grid-rows-1' : 'grid-rows-2';
+  // Grid layout — 1: full, 2: 1x2, 3: 2+1, 4: 2x2
+  const gridClass = videos.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
+  const gridRows = videos.length <= 2 ? 'grid-rows-1' : 'grid-rows-2';
+
+  const handleChatSend = () => {
+    if (!chatInput.trim()) return;
+    setChatMessages(prev => [...prev, {
+      user: 'Sen',
+      msg: chatInput.trim(),
+      avatar: '⚡',
+      time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+    }]);
+    setChatInput('');
+  };
 
   return (
-    <div className="fixed inset-0 z-[100] animate-fade-in" style={{ background: 'rgba(0,0,0,0.95)' }}>
+    <div className="fixed inset-0 z-[100] animate-fade-in flex flex-col" style={{ background: 'rgba(0,0,0,0.97)' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/10" style={{ background: 'rgba(17,24,39,0.9)' }}>
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 shrink-0" style={{ background: 'rgba(17,24,39,0.95)' }}>
         <div className="flex items-center gap-3">
           <span className="text-lg">📺</span>
           <h2 className="text-sm font-bold text-white">Çoklu İzleme</h2>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium">
             {videos.length} kanal
           </span>
-          <span className="text-[10px] text-gray-600 hidden sm:block">← → ok tuşlarıyla ses değiştir | 1-{videos.length} numara tuşları | ESC kapat</span>
+          <span className="text-[10px] text-gray-600 hidden lg:block">← → ses değiştir | 1-{videos.length} numara | ESC kapat</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-500">🔊 Ses: {videos[activeAudioIndex]?.channelTitle}</span>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white text-lg transition-colors">
+        <div className="flex items-center gap-3">
+          {/* Kanal ses seçici */}
+          <div className="hidden sm:flex items-center gap-1">
+            {videos.map((v, i) => (
+              <button
+                key={v.id}
+                onClick={() => onAudioSwitch(i)}
+                className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                  i === activeAudioIndex
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                {i === activeAudioIndex ? '🔊' : '🔇'} {v.channelTitle?.split(' ')[0]}
+              </button>
+            ))}
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500/30 text-white text-sm transition-colors">
             ✕
           </button>
         </div>
       </div>
 
-      {/* Video Grid — tüm ekranı kapla */}
-      <div className={`grid h-[calc(100vh-56px)] ${gridClass} ${gridRows} gap-1 p-1`}>
-        {videos.map((video, idx) => {
-          const videoId = video.ytVideoId || extractVideoId(video.url);
-          const isAudioActive = idx === activeAudioIndex;
-          // 3 video varsa son video tam genişlik alsın
-          const spanClass = videos.length === 3 && idx === 2 ? 'col-span-2' : '';
+      {/* 3-Column Layout: Chat | Videos | Ad */}
+      <div className="flex flex-1 min-h-0">
 
-          return (
-            <div key={video.id} className={`relative group ${spanClass}`}>
-              <iframe
-                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=${isAudioActive ? 0 : 1}`}
-                title={video.title}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-              {/* Overlay controls */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-white truncate">{video.channelTitle}</p>
-                    <p className="text-[10px] text-gray-400 truncate">{video.title}</p>
+        {/* LEFT: Canlı Sohbet — hidden on small screens */}
+        <div className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col border-r border-white/5" style={{ background: 'rgba(15,23,36,0.95)' }}>
+          {/* Chat Header */}
+          <div className="px-3 py-2.5 border-b border-white/10 flex items-center gap-2 shrink-0">
+            <span className="text-sm">💬</span>
+            <span className="text-xs font-bold text-white">Canlı Sohbet</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium ml-auto">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block mr-1 live-pulse"></span>
+              Canlı
+            </span>
+          </div>
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
+            {chatMessages.map((msg, i) => (
+              <div key={i} className="flex gap-2">
+                <span className="text-base shrink-0 mt-0.5">{msg.avatar}</span>
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xs font-bold text-yellow-400">{msg.user}</span>
+                    <span className="text-[9px] text-gray-600">{msg.time}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    <button
-                      onClick={() => onAudioSwitch(idx)}
-                      className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                        isAudioActive
-                          ? 'bg-emerald-500/30 text-emerald-400'
-                          : 'bg-white/10 text-gray-400 hover:bg-white/20'
-                      }`}
-                    >
-                      {isAudioActive ? '🔊 Aktif' : '🔇 Sesi Aç'}
-                    </button>
-                    <button
-                      onClick={() => onRemoveVideo(idx)}
-                      className="px-2 py-1 rounded text-[10px] font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                  <p className="text-xs text-gray-300 leading-relaxed break-words">{msg.msg}</p>
                 </div>
               </div>
-              {/* Audio indicator + kanal numarası */}
-              <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-bold">
-                  {idx + 1}
-                </span>
-                {isAudioActive && (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-400 text-[10px] font-bold">
-                    🔊 SES
-                  </span>
-                )}
-              </div>
+            ))}
+          </div>
+          {/* Chat Input */}
+          <div className="p-2 border-t border-white/10 shrink-0">
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleChatSend()}
+                placeholder="Mesaj yaz..."
+                className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 outline-none focus:border-yellow-500/30"
+              />
+              <button
+                onClick={handleChatSend}
+                className="px-3 py-2 bg-yellow-500/20 text-yellow-400 rounded-lg text-xs font-bold hover:bg-yellow-500/30 transition-colors shrink-0"
+              >
+                Gönder
+              </button>
             </div>
-          );
-        })}
+          </div>
+        </div>
+
+        {/* CENTER: Video Grid */}
+        <div className="flex-1 min-w-0 p-1">
+          <div className={`grid h-full ${gridClass} ${gridRows} gap-1`}>
+            {videos.map((video, idx) => {
+              const videoId = video.ytVideoId || extractVideoId(video.url);
+              const isAudioActive = idx === activeAudioIndex;
+              const spanClass = videos.length === 3 && idx === 2 ? 'col-span-2' : '';
+
+              return (
+                <div key={video.id} className={`relative group rounded-lg overflow-hidden ${spanClass}`}>
+                  <iframe
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=${isAudioActive ? 0 : 1}`}
+                    title={video.title}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                  {/* Overlay controls — hover */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-white truncate">{video.channelTitle}</p>
+                        <p className="text-[10px] text-gray-400 truncate">{video.title}</p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <button
+                          onClick={() => onAudioSwitch(idx)}
+                          className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                            isAudioActive
+                              ? 'bg-emerald-500/30 text-emerald-400'
+                              : 'bg-white/10 text-gray-400 hover:bg-white/20'
+                          }`}
+                        >
+                          {isAudioActive ? '🔊 Aktif' : '🔇 Sesi Aç'}
+                        </button>
+                        <button
+                          onClick={() => onRemoveVideo(idx)}
+                          className="px-1.5 py-1 rounded text-[10px] font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Kanal numarası + ses göstergesi */}
+                  <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      isAudioActive ? 'bg-emerald-500/40 text-emerald-300' : 'bg-black/60 text-white'
+                    }`}>
+                      {isAudioActive ? `🔊 ${idx + 1}` : idx + 1}
+                    </span>
+                  </div>
+                  {/* Kanal adı — her zaman görünür */}
+                  <div className="absolute top-2 right-2">
+                    <span className="px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium">
+                      {video.channelTitle}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* RIGHT: Reklam Banner + Bilgi Paneli — hidden on small screens */}
+        <div className="hidden xl:flex w-56 shrink-0 flex-col border-l border-white/5 p-3 gap-3" style={{ background: 'rgba(15,23,36,0.95)' }}>
+          {/* Sponsor banner */}
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
+            <span className="text-[9px] text-emerald-500/60 font-medium">SPONSOR</span>
+            <div className="mt-2 mb-2">
+              <span className="text-2xl">⚽</span>
+            </div>
+            <p className="text-xs text-emerald-400 font-bold">Nesine.com</p>
+            <p className="text-[10px] text-gray-500 mt-1">İddaa&apos;da en yüksek oranlar</p>
+            <a
+              href="https://www.nesine.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 block px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold hover:bg-emerald-500/30 transition-colors"
+            >
+              Hemen Oyna →
+            </a>
+          </div>
+
+          {/* Reklam Alanı 2 */}
+          <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 text-center">
+            <span className="text-[9px] text-orange-500/60 font-medium">YAYINCI</span>
+            <div className="mt-2 mb-2">
+              <span className="text-2xl">📺</span>
+            </div>
+            <p className="text-xs text-orange-400 font-bold">beIN SPORTS</p>
+            <p className="text-[10px] text-gray-500 mt-1">Tüm maçlar tek yerde</p>
+            <a
+              href="https://www.beinsports.com.tr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 block px-3 py-1.5 bg-orange-500/20 text-orange-400 rounded-lg text-[10px] font-bold hover:bg-orange-500/30 transition-colors"
+            >
+              İzle →
+            </a>
+          </div>
+
+          {/* Kanal listesi */}
+          <div className="flex-1 overflow-y-auto">
+            <p className="text-[10px] text-gray-600 font-medium mb-2">YAYINDA</p>
+            {videos.map((v, i) => (
+              <button
+                key={v.id}
+                onClick={() => onAudioSwitch(i)}
+                className={`w-full text-left px-2.5 py-2 rounded-lg mb-1 transition-all text-xs ${
+                  i === activeAudioIndex
+                    ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                    : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold w-4">{i + 1}</span>
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{v.channelTitle}</p>
+                    <p className="text-[9px] text-gray-600 truncate">{v.title}</p>
+                  </div>
+                  {i === activeAudioIndex && <span className="ml-auto text-[10px]">🔊</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Reklam Alanı 3 — boş alan */}
+          <div className="rounded-xl border border-dashed border-white/10 p-3 text-center">
+            <span className="text-[9px] text-gray-600">REKLAM ALANI</span>
+            <p className="text-[10px] text-gray-700 mt-1">300x250</p>
+          </div>
+        </div>
       </div>
     </div>
   );
