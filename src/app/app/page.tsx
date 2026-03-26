@@ -118,21 +118,21 @@ function MultiViewPlayer({
   const [zapFlash, setZapFlash] = useState(false);
   const [autoDirector, setAutoDirector] = useState(false);
 
-  // Auto Director — her 15sn rastgele başka kanala geç
+  // Auto Director — her 30sn rastgele başka kanala geç
   useEffect(() => {
     if (!autoDirector || videos.length <= 1) return;
     const interval = setInterval(() => {
       const nextIdx = (activeAudioIndex + 1 + Math.floor(Math.random() * (videos.length - 1))) % videos.length;
       onAudioSwitch(nextIdx);
       if (focusIndex !== null) setFocusIndex(nextIdx);
-    }, 15000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [autoDirector, videos.length, activeAudioIndex, onAudioSwitch, focusIndex]);
 
   // Chat messages with reactions
   type ChatMsg = { user: string; msg: string; avatar: string; time: string; likes: number; pinned: boolean; reactions: Record<string, number> };
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([
-    { user: 'Emre1905', msg: '4 kanal aynı anda, efsane!', avatar: '🦁', time: '21:30', likes: 12, pinned: false, reactions: { '🔥': 8, '👍': 4 } },
+    { user: 'Emre1905', msg: '8 kanal aynı anda, efsane!', avatar: '🦁', time: '21:30', likes: 12, pinned: false, reactions: { '🔥': 8, '👍': 4 } },
     { user: 'Fener41', msg: 'Hangi kanalda daha güzel analiz var?', avatar: '🐤', time: '21:31', likes: 8, pinned: false, reactions: { '👍': 3 } },
     { user: 'Arda34', msg: 'Ses geçişi çok iyi çalışıyor', avatar: '🦅', time: '21:32', likes: 5, pinned: false, reactions: { '💪': 5 } },
     { user: 'Sultan1907', msg: 'Bugün herkes canlı, süper akşam!', avatar: '🐤', time: '21:33', likes: 3, pinned: false, reactions: { '🔥': 2, '😂': 1 } },

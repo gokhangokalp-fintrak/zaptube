@@ -85,7 +85,7 @@ body {
   to { width: 100%; }
 }
 .auto-zap-progress {
-  animation: autoZapProgress 15s linear infinite;
+  animation: autoZapProgress 30s linear infinite;
 }
 
 /* Slow spin for auto zap icon */
