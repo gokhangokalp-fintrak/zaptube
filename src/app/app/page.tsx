@@ -489,7 +489,7 @@ function MultiViewPlayer({
                     <>
                       <iframe
                         ref={(el) => { iframeRefs.current[focusIndex] = el; }}
-                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}&mute=1`}
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1`}
                         title={video.title}
                         className="w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -558,7 +558,7 @@ function MultiViewPlayer({
                       {videos.length <= 4 ? (
                         <iframe
                           ref={(el) => { iframeRefs.current[idx] = el; }}
-                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}&mute=1&controls=0`}
+                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1&controls=0`}
                           title={video.title}
                           className="w-full h-full pointer-events-none"
                           allow="autoplay"
@@ -607,7 +607,7 @@ function MultiViewPlayer({
                   >
                     <iframe
                       ref={(el) => { iframeRefs.current[idx] = el; }}
-                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}&mute=1`}
+                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1`}
                       title={video.title}
                       className="w-full h-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
