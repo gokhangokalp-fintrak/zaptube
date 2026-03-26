@@ -1246,6 +1246,9 @@ export default function AppPage() {
   const [multiViewVideos, setMultiViewVideos] = useState<Video[]>([]);
   const [multiViewAudioIndex, setMultiViewAudioIndex] = useState(0);
 
+  // Multi-view selection state (seç → toplu aç)
+  const [multiSelectVideos, setMultiSelectVideos] = useState<Video[]>([]);
+
   // Auto Zap state
   const [autoZapActive, setAutoZapActive] = useState(false);
   const autoZapRef = useRef<NodeJS.Timeout | null>(null);
@@ -1423,6 +1426,23 @@ export default function AppPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (activeVideo || multiViewVideos.length > 0) return; // Modal handles its own keys
+
+      // Enter: start multi-view with selected videos
+      if (e.key === 'Enter' && multiSelectVideos.length > 0) {
+        e.preventDefault();
+        setMultiViewVideos(multiSelectVideos.slice(0, 4));
+        setMultiViewAudioIndex(0);
+        setActiveVideo(null);
+        setMultiSelectVideos([]);
+        return;
+      }
+      // Escape: clear multi-select
+      if (e.key === 'Escape' && multiSelectVideos.length > 0) {
+        e.preventDefault();
+        setMultiSelectVideos([]);
+        return;
+      }
+
       if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
         handleZap('prev');
@@ -1439,7 +1459,7 @@ export default function AppPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeVideo, multiViewVideos, handleZap, allVideos]);
+  }, [activeVideo, multiViewVideos, multiSelectVideos, handleZap, allVideos]);
 
   // Multi-view handlers
   const handleStartMultiView = useCallback((vids: Video[]) => {
@@ -1448,6 +1468,29 @@ export default function AppPage() {
     setActiveVideo(null);
   }, []);
 
+  // Toggle video selection for multi-view (seç/kaldır)
+  const handleMultiSelectToggle = useCallback(
+    (video: Video) => {
+      setMultiSelectVideos((prev) => {
+        const exists = prev.find((v) => v.id === video.id);
+        if (exists) return prev.filter((v) => v.id !== video.id);
+        if (prev.length >= 4) return prev; // Max 4
+        return [...prev, video];
+      });
+    },
+    []
+  );
+
+  // Start multi-view with selected videos
+  const handleMultiSelectStart = useCallback(() => {
+    if (multiSelectVideos.length === 0) return;
+    setMultiViewVideos(multiSelectVideos.slice(0, 4));
+    setMultiViewAudioIndex(0);
+    setActiveVideo(null);
+    setMultiSelectVideos([]); // Clear selection
+  }, [multiSelectVideos]);
+
+  // Legacy: add single video directly to running multi-view
   const handleMultiViewAdd = useCallback(
     (video: Video) => {
       if (multiViewVideos.length >= 4) return;
@@ -1510,6 +1553,50 @@ export default function AppPage() {
           }
         }}
       />
+
+      {/* Multi-Select Floating Bar */}
+      {multiSelectVideos.length > 0 && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[100] animate-slide-up">
+          <div className="bg-[#1a1a2e]/95 backdrop-blur-lg border border-emerald-500/30 rounded-2xl px-4 py-3 shadow-2xl shadow-emerald-500/10 flex items-center gap-3">
+            {/* Selected thumbnails */}
+            <div className="flex -space-x-2">
+              {multiSelectVideos.map((v, i) => (
+                <div key={v.id} className="w-8 h-8 rounded-full border-2 border-emerald-500 overflow-hidden relative">
+                  {v.thumbnail ? (
+                    <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gray-700 flex items-center justify-center text-[10px]">{i + 1}</div>
+                  )}
+                </div>
+              ))}
+              {/* Empty slots */}
+              {Array.from({ length: 4 - multiSelectVideos.length }).map((_, i) => (
+                <div key={`empty-${i}`} className="w-8 h-8 rounded-full border-2 border-dashed border-gray-600 bg-gray-800/50 flex items-center justify-center">
+                  <span className="text-[10px] text-gray-600">+</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Count + Start button */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-400">{multiSelectVideos.length}/4</span>
+              <button
+                onClick={handleMultiSelectStart}
+                className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs px-4 py-2 rounded-xl transition-colors"
+              >
+                📺 Çoklu İzle
+              </button>
+              <button
+                onClick={() => setMultiSelectVideos([])}
+                className="text-gray-500 hover:text-white text-xs px-2 py-2 transition-colors"
+                title="Seçimi temizle"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-white/5" style={{ background: 'rgba(17,24,39,0.95)', backdropFilter: 'blur(8px)' }}>
@@ -1718,14 +1805,20 @@ export default function AppPage() {
                         </div>
                       </div>
                     </button>
-                    {/* Multi-view add button */}
+                    {/* Multi-view select button */}
                     <div className="px-3 pb-2 flex justify-end">
                       <button
-                        onClick={() => handleMultiViewAdd(video)}
-                        className="text-[10px] px-2 py-1 rounded bg-white/5 text-gray-500 hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors"
-                        title="Çoklu izlemeye ekle"
+                        onClick={(e) => { e.stopPropagation(); handleMultiSelectToggle(video); }}
+                        className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                          multiSelectVideos.find((v) => v.id === video.id)
+                            ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/50'
+                            : 'bg-white/5 text-gray-500 hover:bg-emerald-500/10 hover:text-emerald-400'
+                        }`}
+                        title="Çoklu izlemeye ekle/çıkar"
                       >
-                        + Çoklu İzle
+                        {multiSelectVideos.find((v) => v.id === video.id)
+                          ? `✓ Seçildi (${multiSelectVideos.findIndex((v) => v.id === video.id) + 1})`
+                          : '+ Çoklu İzle'}
                       </button>
                     </div>
                   </div>
