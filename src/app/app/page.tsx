@@ -123,26 +123,43 @@ function MultiViewPlayer({
     { user: 'ZapTube', msg: '🔥 Maç sonrası 4 kanalı aynı anda izleyin! Ok tuşlarıyla ses değiştirin.', avatar: '⚡', time: '21:28', likes: 24, pinned: true },
   ]);
 
-  // Keyboard navigation
+  // 5+ video → otomatik focus mode başlat
+  useEffect(() => {
+    if (videos.length > 4 && focusIndex === null) {
+      setFocusIndex(0);
+    }
+  }, [videos.length]);
+
+  // Keyboard navigation — ok tuşlarıyla video geçişi
   useEffect(() => {
     if (videos.length === 0) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (focusIndex !== null) { setFocusIndex(null); } else { onClose(); }
+        if (focusIndex !== null && videos.length <= 4) { setFocusIndex(null); } else { onClose(); }
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault();
-        onAudioSwitch((activeAudioIndex + 1) % videos.length);
+        const nextIdx = (activeAudioIndex + 1) % videos.length;
+        onAudioSwitch(nextIdx);
+        if (focusIndex !== null) setFocusIndex(nextIdx);
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault();
-        onAudioSwitch((activeAudioIndex - 1 + videos.length) % videos.length);
-      } else if (e.key >= '1' && e.key <= '4') {
+        const prevIdx = (activeAudioIndex - 1 + videos.length) % videos.length;
+        onAudioSwitch(prevIdx);
+        if (focusIndex !== null) setFocusIndex(prevIdx);
+      } else if (e.key >= '1' && e.key <= '8') {
         const idx = parseInt(e.key) - 1;
-        if (idx < videos.length) { e.preventDefault(); onAudioSwitch(idx); }
+        if (idx < videos.length) {
+          e.preventDefault();
+          onAudioSwitch(idx);
+          if (focusIndex !== null) setFocusIndex(idx);
+        }
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
-        setFocusIndex(prev => prev !== null ? null : activeAudioIndex);
+        if (videos.length <= 4) {
+          setFocusIndex(prev => prev !== null ? null : activeAudioIndex);
+        }
       }
     };
     window.addEventListener('keydown', handler);
@@ -168,8 +185,9 @@ function MultiViewPlayer({
   const isFocusMode = focusIndex !== null;
   const pinnedMsg = chatMessages.find(m => m.pinned);
 
-  // Focus mode: 1 büyük + altta küçük preview'lar
-  // Normal: 2x2 grid
+  // 5+ video → her zaman focus mode (1 büyük + alt bar)
+  // 1-4 video → normal grid veya focus mode (F ile toggle)
+  const forceFocus = videos.length > 4;
   const gridClass = videos.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
   const gridRows = videos.length <= 2 ? 'grid-rows-1' : 'grid-rows-2';
 
@@ -184,28 +202,30 @@ function MultiViewPlayer({
             {videos.length} kanal
           </span>
 
-          {/* Focus Mode toggle */}
-          <button
-            onClick={() => setFocusIndex(prev => prev !== null ? null : activeAudioIndex)}
-            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-              isFocusMode
-                ? 'bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500/30'
-                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-            }`}
-          >
-            {isFocusMode ? '⊞ Çoklu Ekran' : '⊡ Tek Ekran'}
-          </button>
+          {/* Focus Mode toggle — sadece 4 ve altı video için */}
+          {videos.length <= 4 && (
+            <button
+              onClick={() => setFocusIndex(prev => prev !== null ? null : activeAudioIndex)}
+              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                isFocusMode
+                  ? 'bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500/30'
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              {isFocusMode ? '⊞ Çoklu Ekran' : '⊡ Tek Ekran'}
+            </button>
+          )}
 
-          <span className="text-[10px] text-gray-600 hidden lg:block">← → ses | 1-{videos.length} kanal | F focus | ESC kapat</span>
+          <span className="text-[10px] text-gray-600 hidden lg:block">← → kanal geçiş | 1-{videos.length} direkt seç | {videos.length <= 4 ? 'F focus | ' : ''}ESC kapat</span>
         </div>
         <div className="flex items-center gap-3">
           {/* Kanal ses seçici — büyütülmüş */}
-          <div className="hidden sm:flex items-center gap-1">
+          <div className="hidden sm:flex items-center gap-1 overflow-x-auto max-w-lg">
             {videos.map((v, i) => (
               <button
                 key={v.id}
-                onClick={() => { onAudioSwitch(i); if (isFocusMode) setFocusIndex(i); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                onClick={() => { onAudioSwitch(i); if (focusIndex !== null) setFocusIndex(i); }}
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all shrink-0 ${
                   i === activeAudioIndex
                     ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30'
                     : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'
@@ -313,7 +333,7 @@ function MultiViewPlayer({
 
         {/* CENTER: Video Grid veya Focus Mode */}
         <div className="flex-1 min-w-0 p-1 flex flex-col">
-          {isFocusMode && focusIndex !== null ? (
+          {(isFocusMode || forceFocus) && focusIndex !== null ? (
             /* ====== FOCUS MODE — 1 büyük + alt preview'lar ====== */
             <>
               {/* Ana büyük video */}
@@ -351,8 +371,8 @@ function MultiViewPlayer({
                 })()}
               </div>
 
-              {/* Alt preview strip */}
-              <div className="flex gap-1 h-28 shrink-0">
+              {/* Alt preview strip — yatay scroll ile 8'e kadar */}
+              <div className="flex gap-1 h-24 shrink-0 overflow-x-auto" style={{ scrollSnapType: 'x mandatory' }}>
                 {videos.map((video, idx) => {
                   const videoId = video.ytVideoId || extractVideoId(video.url);
                   const isFocused = idx === focusIndex;
@@ -360,22 +380,39 @@ function MultiViewPlayer({
                     <button
                       key={video.id}
                       onClick={() => { setFocusIndex(idx); onAudioSwitch(idx); }}
-                      className={`relative flex-1 rounded-lg overflow-hidden transition-all ${
+                      className={`relative shrink-0 rounded-lg overflow-hidden transition-all ${
+                        videos.length <= 4 ? 'flex-1' : 'w-40'
+                      } ${
                         isFocused
                           ? 'ring-2 ring-emerald-500 opacity-100'
-                          : 'opacity-60 hover:opacity-90'
+                          : 'opacity-50 hover:opacity-80'
                       }`}
+                      style={{ scrollSnapAlign: 'start' }}
                     >
-                      <iframe
-                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=1&controls=0`}
-                        title={video.title}
-                        className="w-full h-full pointer-events-none"
-                        allow="autoplay"
-                      />
+                      {/* Thumbnail yerine iframe — ama 5+ de thumbnail kullan (performans) */}
+                      {videos.length <= 4 ? (
+                        <iframe
+                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=1&controls=0`}
+                          title={video.title}
+                          className="w-full h-full pointer-events-none"
+                          allow="autoplay"
+                        />
+                      ) : (
+                        <div className="w-full h-full relative">
+                          {video.thumbnail ? (
+                            <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900" />
+                          )}
+                          {isFocused && (
+                            <div className="absolute inset-0 bg-black/20" />
+                          )}
+                        </div>
+                      )}
                       {/* Kanal adı overlay */}
                       <div className="absolute inset-0 flex items-end">
                         <div className="w-full px-2 py-1 bg-gradient-to-t from-black/90 to-transparent">
-                          <p className={`text-[11px] font-bold truncate ${isFocused ? 'text-emerald-400' : 'text-white'}`}>
+                          <p className={`text-[10px] font-bold truncate ${isFocused ? 'text-emerald-400' : 'text-white'}`}>
                             {idx === activeAudioIndex ? '🔊' : `${idx + 1}`} {video.channelTitle}
                           </p>
                         </div>
@@ -1105,6 +1142,23 @@ function LiveEmptyState() {
 // LIVE BANNER
 // =============================================
 function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]; onSelect: (v: Video) => void; onMultiView: (videos: Video[]) => void }) {
+  const [selectedLive, setSelectedLive] = useState<Video[]>([]);
+
+  const toggleSelect = (video: Video) => {
+    setSelectedLive((prev) => {
+      const exists = prev.find((v) => v.id === video.id);
+      if (exists) return prev.filter((v) => v.id !== video.id);
+      if (prev.length >= 8) return prev; // Max 8
+      return [...prev, video];
+    });
+  };
+
+  const startMultiView = () => {
+    if (selectedLive.length === 0) return;
+    onMultiView(selectedLive);
+    setSelectedLive([]);
+  };
+
   return (
     <section className="mb-6 animate-slide-up">
       <div className="flex items-center justify-between mb-3">
@@ -1119,20 +1173,25 @@ function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]
         </h3>
         {liveVideos.length >= 2 && (
           <div className="flex items-center gap-2">
-            {liveVideos.length > 2 && (
-              <button
-                onClick={() => onMultiView(liveVideos.slice(0, 2))}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/5 text-gray-400 text-xs font-medium hover:bg-white/10 transition-colors"
-              >
-                📺 2'li İzle
-              </button>
+            {selectedLive.length > 0 ? (
+              <>
+                <span className="text-[10px] text-gray-500">{selectedLive.length} seçildi</span>
+                <button
+                  onClick={() => setSelectedLive([])}
+                  className="text-[10px] px-2 py-1 rounded-full bg-white/5 text-gray-500 hover:text-white transition-colors"
+                >
+                  Temizle
+                </button>
+                <button
+                  onClick={startMultiView}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold hover:bg-emerald-500/30 transition-colors animate-pulse"
+                >
+                  📺 Çoklu İzle ({selectedLive.length})
+                </button>
+              </>
+            ) : (
+              <span className="text-[10px] text-gray-600">Kartlara tıklayarak seç, çoklu izle</span>
             )}
-            <button
-              onClick={() => onMultiView(liveVideos.slice(0, 4))}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors"
-            >
-              📺 Hepsini İzle ({Math.min(liveVideos.length, 4)})
-            </button>
           </div>
         )}
       </div>
@@ -1141,32 +1200,62 @@ function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]
         <LiveEmptyState />
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollSnapType: 'x mandatory' }}>
-          {liveVideos.map((video) => (
-            <button key={video.id} onClick={() => onSelect(video)}
-              className="flex-shrink-0 w-72 bg-gradient-to-br from-red-950/40 to-[#1e293b] hover:from-red-950/60 border border-red-500/20 hover:border-red-500/40 rounded-xl overflow-hidden transition-all hover:scale-[1.02] group text-left"
-              style={{ scrollSnapAlign: 'start' }}>
-              <div className="relative aspect-video bg-gradient-to-br from-gray-800 to-gray-900">
-                {video.thumbnail && (
-                  <img src={video.thumbnail} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />
-                )}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-red-600/80 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+          {liveVideos.map((video) => {
+            const isSelected = selectedLive.find((v) => v.id === video.id);
+            const selectIdx = selectedLive.findIndex((v) => v.id === video.id);
+            return (
+              <div key={video.id} className="flex-shrink-0 w-72 relative" style={{ scrollSnapAlign: 'start' }}>
+                <button
+                  onClick={() => liveVideos.length >= 2 ? toggleSelect(video) : onSelect(video)}
+                  className={`w-full bg-gradient-to-br from-red-950/40 to-[#1e293b] hover:from-red-950/60 rounded-xl overflow-hidden transition-all hover:scale-[1.02] group text-left ${
+                    isSelected
+                      ? 'border-2 border-emerald-500 ring-2 ring-emerald-500/20'
+                      : 'border border-red-500/20 hover:border-red-500/40'
+                  }`}
+                >
+                  <div className="relative aspect-video bg-gradient-to-br from-gray-800 to-gray-900">
+                    {video.thumbnail && (
+                      <img src={video.thumbnail} alt={video.title} className="absolute inset-0 w-full h-full object-cover" />
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-red-600/80 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                      </div>
+                    </div>
+                    <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
+                    </div>
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-emerald-500 flex items-center justify-center text-white text-sm font-bold shadow-lg">
+                        {selectIdx + 1}
+                      </div>
+                    )}
+                    <div className="absolute bottom-2 right-2 text-[10px] text-white/70 bg-black/60 px-1.5 py-0.5 rounded">
+                      {formatViewCount(video.viewCount)} izliyor
+                    </div>
                   </div>
-                </div>
-                <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
-                </div>
-                <div className="absolute bottom-2 right-2 text-[10px] text-white/70 bg-black/60 px-1.5 py-0.5 rounded">
-                  {formatViewCount(video.viewCount)} izliyor
-                </div>
+                  <div className="p-3">
+                    <p className="text-sm font-medium line-clamp-2 group-hover:text-red-400 transition-colors leading-snug">{video.title}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-[11px] text-gray-500">{video.channelTitle}</p>
+                      {isSelected && (
+                        <span className="text-[10px] text-emerald-400 font-bold">✓ Seçildi</span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+                {/* Tek izle butonu */}
+                {liveVideos.length >= 2 && (
+                  <button
+                    onClick={() => onSelect(video)}
+                    className="absolute bottom-14 right-3 text-[10px] px-2 py-1 rounded bg-black/60 text-gray-400 hover:text-white hover:bg-black/80 transition-colors backdrop-blur-sm z-10"
+                  >
+                    ▶ Tek İzle
+                  </button>
+                )}
               </div>
-              <div className="p-3">
-                <p className="text-sm font-medium line-clamp-2 group-hover:text-red-400 transition-colors leading-snug">{video.title}</p>
-                <p className="text-[11px] text-gray-500 mt-1">{video.channelTitle}</p>
-              </div>
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
@@ -1430,7 +1519,7 @@ export default function AppPage() {
       // Enter: start multi-view with selected videos
       if (e.key === 'Enter' && multiSelectVideos.length > 0) {
         e.preventDefault();
-        setMultiViewVideos(multiSelectVideos.slice(0, 4));
+        setMultiViewVideos(multiSelectVideos.slice(0, 8));
         setMultiViewAudioIndex(0);
         setActiveVideo(null);
         setMultiSelectVideos([]);
@@ -1463,7 +1552,7 @@ export default function AppPage() {
 
   // Multi-view handlers
   const handleStartMultiView = useCallback((vids: Video[]) => {
-    setMultiViewVideos(vids.slice(0, 4)); // Max 4
+    setMultiViewVideos(vids.slice(0, 8)); // Max 8
     setMultiViewAudioIndex(0);
     setActiveVideo(null);
   }, []);
@@ -1474,7 +1563,7 @@ export default function AppPage() {
       setMultiSelectVideos((prev) => {
         const exists = prev.find((v) => v.id === video.id);
         if (exists) return prev.filter((v) => v.id !== video.id);
-        if (prev.length >= 4) return prev; // Max 4
+        if (prev.length >= 8) return prev; // Max 8
         return [...prev, video];
       });
     },
@@ -1484,7 +1573,7 @@ export default function AppPage() {
   // Start multi-view with selected videos
   const handleMultiSelectStart = useCallback(() => {
     if (multiSelectVideos.length === 0) return;
-    setMultiViewVideos(multiSelectVideos.slice(0, 4));
+    setMultiViewVideos(multiSelectVideos.slice(0, 8));
     setMultiViewAudioIndex(0);
     setActiveVideo(null);
     setMultiSelectVideos([]); // Clear selection
@@ -1493,7 +1582,7 @@ export default function AppPage() {
   // Legacy: add single video directly to running multi-view
   const handleMultiViewAdd = useCallback(
     (video: Video) => {
-      if (multiViewVideos.length >= 4) return;
+      if (multiViewVideos.length >= 8) return;
       if (multiViewVideos.find((v) => v.id === video.id)) return;
       setMultiViewVideos((prev) => [...prev, video]);
     },
@@ -1569,8 +1658,8 @@ export default function AppPage() {
                   )}
                 </div>
               ))}
-              {/* Empty slots */}
-              {Array.from({ length: 4 - multiSelectVideos.length }).map((_, i) => (
+              {/* Empty slots (show max 2 extras) */}
+              {multiSelectVideos.length < 8 && Array.from({ length: Math.min(2, 8 - multiSelectVideos.length) }).map((_, i) => (
                 <div key={`empty-${i}`} className="w-8 h-8 rounded-full border-2 border-dashed border-gray-600 bg-gray-800/50 flex items-center justify-center">
                   <span className="text-[10px] text-gray-600">+</span>
                 </div>
@@ -1579,7 +1668,7 @@ export default function AppPage() {
 
             {/* Count + Start button */}
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">{multiSelectVideos.length}/4</span>
+              <span className="text-xs text-gray-400">{multiSelectVideos.length}/8</span>
               <button
                 onClick={handleMultiSelectStart}
                 className="bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs px-4 py-2 rounded-xl transition-colors"
