@@ -112,21 +112,25 @@ function MultiViewPlayer({
   onRemoveVideo: (idx: number) => void;
 }) {
   const [chatInput, setChatInput] = useState('');
+  const [focusIndex, setFocusIndex] = useState<number | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [onlineCount] = useState(() => Math.floor(Math.random() * 2000) + 1200);
   const [chatMessages, setChatMessages] = useState([
-    { user: 'Emre1905', msg: '4 kanal aynı anda, efsane! 🔥', avatar: '🦁', time: '21:30' },
-    { user: 'Fener41', msg: 'Hangi kanalda daha güzel analiz var?', avatar: '🐤', time: '21:31' },
-    { user: 'Arda34', msg: 'Ses geçişi çok iyi çalışıyor', avatar: '🦅', time: '21:32' },
+    { user: 'Emre1905', msg: '4 kanal aynı anda, efsane! 🔥', avatar: '🦁', time: '21:30', likes: 12, pinned: false },
+    { user: 'Fener41', msg: 'Hangi kanalda daha güzel analiz var?', avatar: '🐤', time: '21:31', likes: 8, pinned: false },
+    { user: 'Arda34', msg: 'Ses geçişi çok iyi çalışıyor 💪', avatar: '🦅', time: '21:32', likes: 5, pinned: false },
+    { user: 'Sultan1907', msg: 'Bugün herkes canlı, süper akşam!', avatar: '🐤', time: '21:33', likes: 3, pinned: false },
+    { user: 'ZapTube', msg: '🔥 Maç sonrası 4 kanalı aynı anda izleyin! Ok tuşlarıyla ses değiştirin.', avatar: '⚡', time: '21:28', likes: 24, pinned: true },
   ]);
 
-  // Keyboard navigation — ok tuşlarıyla ses geçişi, ESC ile kapat
+  // Keyboard navigation
   useEffect(() => {
     if (videos.length === 0) return;
     const handler = (e: KeyboardEvent) => {
-      // Chat input'taysa ok tuşlarını engelleme
       if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        if (focusIndex !== null) { setFocusIndex(null); } else { onClose(); }
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault();
         onAudioSwitch((activeAudioIndex + 1) % videos.length);
@@ -135,32 +139,39 @@ function MultiViewPlayer({
         onAudioSwitch((activeAudioIndex - 1 + videos.length) % videos.length);
       } else if (e.key >= '1' && e.key <= '4') {
         const idx = parseInt(e.key) - 1;
-        if (idx < videos.length) {
-          e.preventDefault();
-          onAudioSwitch(idx);
-        }
+        if (idx < videos.length) { e.preventDefault(); onAudioSwitch(idx); }
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        setFocusIndex(prev => prev !== null ? null : activeAudioIndex);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [videos.length, activeAudioIndex, onAudioSwitch, onClose]);
+  }, [videos.length, activeAudioIndex, onAudioSwitch, onClose, focusIndex]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
 
   if (videos.length === 0) return null;
-
-  // Grid layout — 1: full, 2: 1x2, 3: 2+1, 4: 2x2
-  const gridClass = videos.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
-  const gridRows = videos.length <= 2 ? 'grid-rows-1' : 'grid-rows-2';
 
   const handleChatSend = () => {
     if (!chatInput.trim()) return;
     setChatMessages(prev => [...prev, {
-      user: 'Sen',
-      msg: chatInput.trim(),
-      avatar: '⚡',
+      user: 'Sen', msg: chatInput.trim(), avatar: '⚡', likes: 0, pinned: false,
       time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
     }]);
     setChatInput('');
   };
+
+  const isFocusMode = focusIndex !== null;
+  const pinnedMsg = chatMessages.find(m => m.pinned);
+
+  // Focus mode: 1 büyük + altta küçük preview'lar
+  // Normal: 2x2 grid
+  const gridClass = videos.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
+  const gridRows = videos.length <= 2 ? 'grid-rows-1' : 'grid-rows-2';
 
   return (
     <div className="fixed inset-0 z-[100] animate-fade-in flex flex-col" style={{ background: 'rgba(0,0,0,0.97)' }}>
@@ -172,22 +183,35 @@ function MultiViewPlayer({
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium">
             {videos.length} kanal
           </span>
-          <span className="text-[10px] text-gray-600 hidden lg:block">← → ses değiştir | 1-{videos.length} numara | ESC kapat</span>
+
+          {/* Focus Mode toggle */}
+          <button
+            onClick={() => setFocusIndex(prev => prev !== null ? null : activeAudioIndex)}
+            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
+              isFocusMode
+                ? 'bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500/30'
+                : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            {isFocusMode ? '⊞ Çoklu Ekran' : '⊡ Tek Ekran'}
+          </button>
+
+          <span className="text-[10px] text-gray-600 hidden lg:block">← → ses | 1-{videos.length} kanal | F focus | ESC kapat</span>
         </div>
         <div className="flex items-center gap-3">
-          {/* Kanal ses seçici */}
+          {/* Kanal ses seçici — büyütülmüş */}
           <div className="hidden sm:flex items-center gap-1">
             {videos.map((v, i) => (
               <button
                 key={v.id}
-                onClick={() => onAudioSwitch(i)}
-                className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                onClick={() => { onAudioSwitch(i); if (isFocusMode) setFocusIndex(i); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   i === activeAudioIndex
-                    ? 'bg-emerald-500/20 text-emerald-400'
+                    ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30'
                     : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                {i === activeAudioIndex ? '🔊' : '🔇'} {v.channelTitle?.split(' ')[0]}
+                {i === activeAudioIndex ? '🔊' : '🔇'} {v.channelTitle}
               </button>
             ))}
           </div>
@@ -197,49 +221,89 @@ function MultiViewPlayer({
         </div>
       </div>
 
+      {/* Sponsor Bar — video altı ticker */}
+      <div className="flex items-center justify-center gap-6 px-4 py-1 shrink-0 border-b border-white/5" style={{ background: 'rgba(17,24,39,0.7)' }}>
+        <span className="text-[9px] text-gray-600">SPONSOR</span>
+        <span className="text-[10px] text-emerald-400/80 font-medium">⚡ Bu yayın <strong>Nesine.com</strong> sponsorluğunda</span>
+        <span className="text-[10px] text-gray-600">|</span>
+        <span className="text-[10px] text-orange-400/80 font-medium">📺 Maçlar <strong>beIN SPORTS</strong>&apos;ta</span>
+      </div>
+
       {/* 3-Column Layout: Chat | Videos | Ad */}
       <div className="flex flex-1 min-h-0">
 
-        {/* LEFT: Canlı Sohbet — hidden on small screens */}
+        {/* LEFT: Canlı Sohbet — güçlendirilmiş */}
         <div className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col border-r border-white/5" style={{ background: 'rgba(15,23,36,0.95)' }}>
-          {/* Chat Header */}
-          <div className="px-3 py-2.5 border-b border-white/10 flex items-center gap-2 shrink-0">
-            <span className="text-sm">💬</span>
-            <span className="text-xs font-bold text-white">Canlı Sohbet</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium ml-auto">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block mr-1 live-pulse"></span>
-              Canlı
-            </span>
+          {/* Chat Header — büyütülmüş */}
+          <div className="px-3 py-3 border-b border-white/10 shrink-0">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-base">💬</span>
+                <span className="text-sm font-bold text-white">Canlı Sohbet</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block mr-1 live-pulse"></span>
+                CANLI
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-yellow-400 font-bold">{onlineCount.toLocaleString('tr-TR')} kisi sohbet ediyor 🔥</span>
+            </div>
           </div>
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
-            {chatMessages.map((msg, i) => (
-              <div key={i} className="flex gap-2">
-                <span className="text-base shrink-0 mt-0.5">{msg.avatar}</span>
+
+          {/* Pinned message */}
+          {pinnedMsg && (
+            <div className="px-3 py-2 border-b border-yellow-500/10 bg-yellow-500/5 shrink-0">
+              <div className="flex items-start gap-2">
+                <span className="text-xs">📌</span>
                 <div className="min-w-0">
+                  <span className="text-[10px] font-bold text-yellow-400">{pinnedMsg.user}</span>
+                  <p className="text-xs text-yellow-200/80 leading-snug">{pinnedMsg.msg}</p>
+                </div>
+                <span className="text-[9px] text-yellow-500/60 shrink-0 ml-auto">❤ {pinnedMsg.likes}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Chat Messages — büyütülmüş */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
+            {chatMessages.filter(m => !m.pinned).map((msg, i) => (
+              <div key={i} className="flex gap-2.5 group/msg">
+                <span className="text-lg shrink-0">{msg.avatar}</span>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-xs font-bold text-yellow-400">{msg.user}</span>
-                    <span className="text-[9px] text-gray-600">{msg.time}</span>
+                    <span className="text-sm font-bold text-yellow-400">{msg.user}</span>
+                    <span className="text-[10px] text-gray-600">{msg.time}</span>
+                    {msg.likes > 0 && (
+                      <span className="text-[9px] text-red-400/60 ml-auto opacity-0 group-hover/msg:opacity-100 transition-opacity">❤ {msg.likes}</span>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-300 leading-relaxed break-words">{msg.msg}</p>
+                  <p className="text-sm text-gray-200 leading-relaxed break-words">{msg.msg}</p>
                 </div>
               </div>
             ))}
+            <div ref={chatEndRef} />
           </div>
-          {/* Chat Input */}
-          <div className="p-2 border-t border-white/10 shrink-0">
-            <div className="flex gap-1.5">
+
+          {/* Chat Sponsor */}
+          <div className="px-3 py-1 border-t border-white/5 bg-emerald-500/5 shrink-0">
+            <span className="text-[9px] text-emerald-500/60">Sohbet Sponsoru: <strong className="text-emerald-400/80">Nesine.com</strong> — Hemen Oyna!</span>
+          </div>
+
+          {/* Chat Input — büyütülmüş */}
+          <div className="p-2.5 border-t border-white/10 shrink-0">
+            <div className="flex gap-2">
               <input
                 type="text"
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleChatSend()}
                 placeholder="Mesaj yaz..."
-                className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 outline-none focus:border-yellow-500/30"
+                className="flex-1 px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 outline-none focus:border-yellow-500/40 focus:bg-white/[0.07] transition-all"
               />
               <button
                 onClick={handleChatSend}
-                className="px-3 py-2 bg-yellow-500/20 text-yellow-400 rounded-lg text-xs font-bold hover:bg-yellow-500/30 transition-colors shrink-0"
+                className="px-4 py-2.5 bg-yellow-500/20 text-yellow-400 rounded-lg text-xs font-bold hover:bg-yellow-500/30 transition-colors shrink-0"
               >
                 Gönder
               </button>
@@ -247,71 +311,159 @@ function MultiViewPlayer({
           </div>
         </div>
 
-        {/* CENTER: Video Grid */}
-        <div className="flex-1 min-w-0 p-1">
-          <div className={`grid h-full ${gridClass} ${gridRows} gap-1`}>
-            {videos.map((video, idx) => {
-              const videoId = video.ytVideoId || extractVideoId(video.url);
-              const isAudioActive = idx === activeAudioIndex;
-              const spanClass = videos.length === 3 && idx === 2 ? 'col-span-2' : '';
-
-              return (
-                <div key={video.id} className={`relative group rounded-lg overflow-hidden ${spanClass}`}>
-                  <iframe
-                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=${isAudioActive ? 0 : 1}`}
-                    title={video.title}
-                    className="w-full h-full"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                  {/* Overlay controls — hover */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-white truncate">{video.channelTitle}</p>
-                        <p className="text-[10px] text-gray-400 truncate">{video.title}</p>
+        {/* CENTER: Video Grid veya Focus Mode */}
+        <div className="flex-1 min-w-0 p-1 flex flex-col">
+          {isFocusMode && focusIndex !== null ? (
+            /* ====== FOCUS MODE — 1 büyük + alt preview'lar ====== */
+            <>
+              {/* Ana büyük video */}
+              <div className="flex-1 relative rounded-lg overflow-hidden mb-1">
+                {(() => {
+                  const video = videos[focusIndex];
+                  if (!video) return null;
+                  const videoId = video.ytVideoId || extractVideoId(video.url);
+                  return (
+                    <>
+                      <iframe
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=0`}
+                        title={video.title}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                      {/* Büyük kanal adı overlay */}
+                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                        <span className="px-3 py-1.5 rounded-lg bg-emerald-500/30 text-emerald-300 text-sm font-bold backdrop-blur-sm">
+                          🔊 {video.channelTitle}
+                        </span>
+                        <span className="px-2 py-1 rounded bg-red-600 text-white text-[10px] font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
+                        </span>
                       </div>
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <button
-                          onClick={() => onAudioSwitch(idx)}
-                          className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                            isAudioActive
-                              ? 'bg-emerald-500/30 text-emerald-400'
-                              : 'bg-white/10 text-gray-400 hover:bg-white/20'
-                          }`}
-                        >
-                          {isAudioActive ? '🔊 Aktif' : '🔇 Sesi Aç'}
-                        </button>
-                        <button
-                          onClick={() => onRemoveVideo(idx)}
-                          className="px-1.5 py-1 rounded text-[10px] font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
-                        >
-                          ✕
-                        </button>
+                      {/* Sponsor overlay alt */}
+                      <div className="absolute bottom-3 right-3">
+                        <span className="px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-emerald-400/80 font-medium backdrop-blur-sm">
+                          ⚡ Nesine sponsorluğunda
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Alt preview strip */}
+              <div className="flex gap-1 h-28 shrink-0">
+                {videos.map((video, idx) => {
+                  const videoId = video.ytVideoId || extractVideoId(video.url);
+                  const isFocused = idx === focusIndex;
+                  return (
+                    <button
+                      key={video.id}
+                      onClick={() => { setFocusIndex(idx); onAudioSwitch(idx); }}
+                      className={`relative flex-1 rounded-lg overflow-hidden transition-all ${
+                        isFocused
+                          ? 'ring-2 ring-emerald-500 opacity-100'
+                          : 'opacity-60 hover:opacity-90'
+                      }`}
+                    >
+                      <iframe
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=1&controls=0`}
+                        title={video.title}
+                        className="w-full h-full pointer-events-none"
+                        allow="autoplay"
+                      />
+                      {/* Kanal adı overlay */}
+                      <div className="absolute inset-0 flex items-end">
+                        <div className="w-full px-2 py-1 bg-gradient-to-t from-black/90 to-transparent">
+                          <p className={`text-[11px] font-bold truncate ${isFocused ? 'text-emerald-400' : 'text-white'}`}>
+                            {idx === activeAudioIndex ? '🔊' : `${idx + 1}`} {video.channelTitle}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            /* ====== NORMAL MODE — 2x2 grid ====== */
+            <div className={`grid h-full ${gridClass} ${gridRows} gap-1`}>
+              {videos.map((video, idx) => {
+                const videoId = video.ytVideoId || extractVideoId(video.url);
+                const isAudioActive = idx === activeAudioIndex;
+                const spanClass = videos.length === 3 && idx === 2 ? 'col-span-2' : '';
+
+                return (
+                  <div
+                    key={video.id}
+                    className={`relative group rounded-lg overflow-hidden cursor-pointer ${spanClass} ${
+                      isAudioActive ? 'ring-2 ring-emerald-500/50' : ''
+                    }`}
+                    onDoubleClick={() => { setFocusIndex(idx); onAudioSwitch(idx); }}
+                  >
+                    <iframe
+                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=${isAudioActive ? 0 : 1}`}
+                      title={video.title}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                    {/* Kanal adı — HER ZAMAN görünür, büyütülmüş */}
+                    <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent px-3 py-2 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          isAudioActive ? 'bg-emerald-500/40 text-emerald-300' : 'bg-black/50 text-white/90'
+                        }`}>
+                          {isAudioActive ? '🔊' : idx + 1}
+                        </span>
+                        <span className="text-sm font-bold text-white drop-shadow-lg">{video.channelTitle}</span>
+                        {video.live && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600 text-white text-[9px] font-bold">
+                            <span className="w-1 h-1 rounded-full bg-white live-pulse"></span>CANLI
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => { setFocusIndex(idx); onAudioSwitch(idx); }}
+                        className="px-1.5 py-0.5 rounded text-[9px] bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                        title="Focus mode"
+                      >
+                        ⊡
+                      </button>
+                    </div>
+
+                    {/* Alt kontroller — hover */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-gray-300 truncate flex-1">{video.title}</p>
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          <button
+                            onClick={() => onAudioSwitch(idx)}
+                            className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
+                              isAudioActive
+                                ? 'bg-emerald-500/30 text-emerald-400'
+                                : 'bg-white/10 text-gray-400 hover:bg-white/20'
+                            }`}
+                          >
+                            {isAudioActive ? '🔊 Aktif' : '🔇 Sesi Aç'}
+                          </button>
+                          <button
+                            onClick={() => onRemoveVideo(idx)}
+                            className="px-1.5 py-1 rounded text-[10px] font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                  {/* Kanal numarası + ses göstergesi */}
-                  <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      isAudioActive ? 'bg-emerald-500/40 text-emerald-300' : 'bg-black/60 text-white'
-                    }`}>
-                      {isAudioActive ? `🔊 ${idx + 1}` : idx + 1}
-                    </span>
-                  </div>
-                  {/* Kanal adı — her zaman görünür */}
-                  <div className="absolute top-2 right-2">
-                    <span className="px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium">
-                      {video.channelTitle}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* RIGHT: Reklam Banner + Bilgi Paneli — hidden on small screens */}
+        {/* RIGHT: Reklam + Kanal Paneli */}
         <div className="hidden xl:flex w-56 shrink-0 flex-col border-l border-white/5 p-3 gap-3" style={{ background: 'rgba(15,23,36,0.95)' }}>
           {/* Sponsor banner */}
           <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
@@ -321,60 +473,52 @@ function MultiViewPlayer({
             </div>
             <p className="text-xs text-emerald-400 font-bold">Nesine.com</p>
             <p className="text-[10px] text-gray-500 mt-1">İddaa&apos;da en yüksek oranlar</p>
-            <a
-              href="https://www.nesine.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 block px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold hover:bg-emerald-500/30 transition-colors"
-            >
+            <a href="https://www.nesine.com" target="_blank" rel="noopener noreferrer"
+              className="mt-2 block px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold hover:bg-emerald-500/30 transition-colors">
               Hemen Oyna →
             </a>
           </div>
 
-          {/* Reklam Alanı 2 */}
+          {/* beIN SPORTS */}
           <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 text-center">
             <span className="text-[9px] text-orange-500/60 font-medium">YAYINCI</span>
-            <div className="mt-2 mb-2">
-              <span className="text-2xl">📺</span>
-            </div>
+            <div className="mt-2 mb-2"><span className="text-2xl">📺</span></div>
             <p className="text-xs text-orange-400 font-bold">beIN SPORTS</p>
-            <p className="text-[10px] text-gray-500 mt-1">Tüm maçlar tek yerde</p>
-            <a
-              href="https://www.beinsports.com.tr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 block px-3 py-1.5 bg-orange-500/20 text-orange-400 rounded-lg text-[10px] font-bold hover:bg-orange-500/30 transition-colors"
-            >
+            <p className="text-[10px] text-gray-500 mt-1">Tüm maclar tek yerde</p>
+            <a href="https://www.beinsports.com.tr" target="_blank" rel="noopener noreferrer"
+              className="mt-2 block px-3 py-1.5 bg-orange-500/20 text-orange-400 rounded-lg text-[10px] font-bold hover:bg-orange-500/30 transition-colors">
               İzle →
             </a>
           </div>
 
-          {/* Kanal listesi */}
+          {/* Kanal listesi — büyütülmüş */}
           <div className="flex-1 overflow-y-auto">
-            <p className="text-[10px] text-gray-600 font-medium mb-2">YAYINDA</p>
+            <p className="text-[10px] text-gray-600 font-medium mb-2">YAYINDA OLAN KANALLAR</p>
             {videos.map((v, i) => (
               <button
                 key={v.id}
-                onClick={() => onAudioSwitch(i)}
-                className={`w-full text-left px-2.5 py-2 rounded-lg mb-1 transition-all text-xs ${
+                onClick={() => { onAudioSwitch(i); if (isFocusMode) setFocusIndex(i); }}
+                className={`w-full text-left px-2.5 py-2.5 rounded-lg mb-1.5 transition-all ${
                   i === activeAudioIndex
                     ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
                     : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold w-4">{i + 1}</span>
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{v.channelTitle}</p>
-                    <p className="text-[9px] text-gray-600 truncate">{v.title}</p>
+                  <span className={`text-sm font-bold w-5 text-center ${i === activeAudioIndex ? 'text-emerald-400' : 'text-gray-500'}`}>
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold truncate">{v.channelTitle}</p>
+                    <p className="text-[9px] text-gray-600 truncate mt-0.5">{v.title}</p>
                   </div>
-                  {i === activeAudioIndex && <span className="ml-auto text-[10px]">🔊</span>}
+                  {i === activeAudioIndex && <span className="text-sm">🔊</span>}
                 </div>
               </button>
             ))}
           </div>
 
-          {/* Reklam Alanı 3 — boş alan */}
+          {/* Alt reklam alanı */}
           <div className="rounded-xl border border-dashed border-white/10 p-3 text-center">
             <span className="text-[9px] text-gray-600">REKLAM ALANI</span>
             <p className="text-[10px] text-gray-700 mt-1">300x250</p>
