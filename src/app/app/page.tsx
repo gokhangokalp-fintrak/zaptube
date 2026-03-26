@@ -477,62 +477,63 @@ function MultiViewPlayer({
         {/* CENTER: Video Grid veya Focus Mode */}
         <div className="flex-1 min-w-0 p-1 flex flex-col">
           {(isFocusMode || forceFocus) && focusIndex !== null ? (
-            /* ====== FOCUS MODE — 1 büyük + alt preview'lar ====== */
+            /* ====== FOCUS MODE — tüm iframe'ler aynı anda yüklü, CSS ile geçiş (iOS autoplay koruması) ====== */
             <>
-              {/* Ana büyük video */}
+              {/* Ana büyük video — TÜM iframe'ler render edilir, sadece aktif olan görünür */}
               <div className="flex-1 relative rounded-lg overflow-hidden mb-1">
-                {(() => {
-                  const video = videos[focusIndex];
-                  if (!video) return null;
+                {videos.map((video, idx) => {
                   const videoId = video.ytVideoId || extractVideoId(video.url);
+                  const isVisible = idx === focusIndex;
                   return (
-                    <>
+                    <div key={video.id} className={`absolute inset-0 transition-opacity duration-200 ${isVisible ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                       <iframe
-                        ref={(el) => { iframeRefs.current[focusIndex] = el; }}
+                        ref={(el) => { iframeRefs.current[idx] = el; }}
                         src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1`}
                         title={video.title}
                         className="w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
                       />
-                      {/* Üst bar: kanal adı + rozetler */}
-                      <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="px-3 py-1.5 rounded-lg bg-emerald-500/30 text-emerald-300 text-sm font-bold backdrop-blur-sm">
-                            🔊 {video.channelTitle}
-                          </span>
-                          {video.live && (
-                            <span className="px-2 py-1 rounded bg-red-600 text-white text-[10px] font-bold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
-                            </span>
-                          )}
-                        </div>
-                        {/* Anlık rozetler */}
-                        <div className="flex items-center gap-2">
-                          <span className="px-2 py-1 rounded-lg bg-black/60 text-[10px] text-red-400 font-bold backdrop-blur-sm flex items-center gap-1">
-                            🔥 {(onlineCount + Math.floor(Math.random() * 200)).toLocaleString('tr-TR')} kişi burada
-                          </span>
-                          {focusIndex === 0 && (
-                            <span className="px-2 py-1 rounded-lg bg-yellow-500/20 text-[10px] text-yellow-400 font-bold backdrop-blur-sm">
-                              ⚡ En çok izlenen
-                            </span>
-                          )}
-                          {videos.length >= 4 && focusIndex !== null && focusIndex >= videos.length - 2 && (
-                            <span className="px-2 py-1 rounded-lg bg-purple-500/20 text-[10px] text-purple-400 font-bold backdrop-blur-sm">
-                              💥 Trend
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {/* Sponsor overlay alt */}
-                      <div className="absolute bottom-3 right-3">
-                        <span className="px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-emerald-400/80 font-medium backdrop-blur-sm">
-                          ⚡ Nesine sponsorluğunda
-                        </span>
-                      </div>
-                    </>
+                    </div>
                   );
-                })()}
+                })}
+                {/* Üst bar: kanal adı + rozetler — aktif video bilgisi */}
+                {focusIndex !== null && videos[focusIndex] && (
+                  <>
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20 pointer-events-none">
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1.5 rounded-lg bg-emerald-500/30 text-emerald-300 text-sm font-bold backdrop-blur-sm">
+                          🔊 {videos[focusIndex].channelTitle}
+                        </span>
+                        {videos[focusIndex].live && (
+                          <span className="px-2 py-1 rounded bg-red-600 text-white text-[10px] font-bold flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white live-pulse"></span> CANLI
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-1 rounded-lg bg-black/60 text-[10px] text-red-400 font-bold backdrop-blur-sm flex items-center gap-1">
+                          🔥 {(onlineCount + Math.floor(Math.random() * 200)).toLocaleString('tr-TR')} kişi burada
+                        </span>
+                        {focusIndex === 0 && (
+                          <span className="px-2 py-1 rounded-lg bg-yellow-500/20 text-[10px] text-yellow-400 font-bold backdrop-blur-sm">
+                            ⚡ En çok izlenen
+                          </span>
+                        )}
+                        {videos.length >= 4 && focusIndex >= videos.length - 2 && (
+                          <span className="px-2 py-1 rounded-lg bg-purple-500/20 text-[10px] text-purple-400 font-bold backdrop-blur-sm">
+                            💥 Trend
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="absolute bottom-3 right-3 z-20 pointer-events-none">
+                      <span className="px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-emerald-400/80 font-medium backdrop-blur-sm">
+                        ⚡ Nesine sponsorluğunda
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Alt preview strip — glow efektli, yatay scroll */}
