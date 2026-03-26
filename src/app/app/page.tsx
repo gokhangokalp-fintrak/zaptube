@@ -117,6 +117,7 @@ function MultiViewPlayer({
   const [onlineCount] = useState(() => Math.floor(Math.random() * 2000) + 1200);
   const [zapFlash, setZapFlash] = useState(false);
   const [autoDirector, setAutoDirector] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const iframeRefs = useRef<(HTMLIFrameElement | null)[]>([]);
 
   // iOS-safe: tüm iframe'ler muted başlar, aktif olan postMessage ile unmute edilir
@@ -246,7 +247,6 @@ function MultiViewPlayer({
     setChatInput('');
   };
 
-  const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const isFocusMode = focusIndex !== null;
   const pinnedMsg = chatMessages.find(m => m.pinned);
 
