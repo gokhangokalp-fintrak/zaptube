@@ -65,6 +65,11 @@ export const BADGE_DEFINITIONS = [
 // =============================================
 // USER PROFILE FUNCTIONS
 // =============================================
+// İlk 1000 üye otomatik Seviye 3 (Fanatik) başlar
+const EARLY_BIRD_LIMIT = 1000;
+const EARLY_BIRD_LEVEL = 3;
+const EARLY_BIRD_XP = 200; // Seviye 3 için gereken XP
+
 export async function getUserProfile(userId: string) {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -74,10 +79,18 @@ export async function getUserProfile(userId: string) {
     .single();
 
   if (error && error.code === 'PGRST116') {
-    // No profile yet, create one
+    // No profile yet — check if early bird (first 1000 users)
+    const { count } = await supabase
+      .from('user_profiles')
+      .select('id', { count: 'exact', head: true });
+
+    const isEarlyBird = (count || 0) < EARLY_BIRD_LIMIT;
+    const startLevel = isEarlyBird ? EARLY_BIRD_LEVEL : 1;
+    const startXp = isEarlyBird ? EARLY_BIRD_XP : 0;
+
     const { data: newProfile } = await supabase
       .from('user_profiles')
-      .insert({ user_id: userId, xp: 0, level: 1 })
+      .insert({ user_id: userId, xp: startXp, level: startLevel })
       .select()
       .single();
     return newProfile;
