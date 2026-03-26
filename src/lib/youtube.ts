@@ -291,6 +291,93 @@ export async function searchChannelVideos(
 }
 
 // =============================================
+// ⚡ LIVE STREAM DETECTION — KOTA DOSTU!
+// Tek bir search çağrısı (100 birim) + 5 dk cache
+// 16 kanal için 16x100=1600 yerine sadece 100 birim!
+// =============================================
+async function fetchLiveStreams(
+  channelIds: string[],
+  apiKey: string
+): Promise<Video[]> {
+  const cacheKey = `live:all`;
+  const cached = await getCached(cacheKey);
+  if (cached) return cached;
+
+  try {
+    // Tek bir genel arama — "türk futbol" canlı yayınları
+    // Bu sadece 100 birim harcar (16 kanal için 1600 yerine)
+    const params = new URLSearchParams({
+      part: 'snippet',
+      q: 'futbol türkiye süper lig',
+      eventType: 'live',
+      type: 'video',
+      maxResults: '10',
+      relevanceLanguage: 'tr',
+      key: apiKey,
+    });
+
+    const res = await fetch(`${YOUTUBE_API_BASE}/search?${params}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const items = data.items || [];
+    if (items.length === 0) {
+      // Cache empty result for 5 min too (don't keep checking)
+      await setCache(cacheKey, [], 0.25);
+      return [];
+    }
+
+    // Filter: only keep videos from OUR channels
+    const channelSet = new Set(channelIds);
+    const ourItems = items.filter((item: any) =>
+      channelSet.has(item.snippet?.channelId)
+    );
+
+    if (ourItems.length === 0) {
+      await setCache(cacheKey, [], 0.25);
+      return [];
+    }
+
+    // Get full details (1 birim per 50 videos — cheap!)
+    const videoIds = ourItems.map((item: any) => item.id?.videoId).filter(Boolean).join(',');
+    if (!videoIds) return [];
+
+    const detailsRes = await fetch(
+      `${YOUTUBE_API_BASE}/videos?` +
+        new URLSearchParams({
+          part: 'snippet,statistics,liveStreamingDetails',
+          id: videoIds,
+          key: apiKey,
+        })
+    );
+    if (!detailsRes.ok) return [];
+    const detailsData = await detailsRes.json();
+
+    const liveVideos: Video[] = (detailsData.items || []).map((item: any) => ({
+      id: item.id,
+      title: item.snippet.title,
+      channelTitle: item.snippet.channelTitle,
+      channelId: item.snippet.channelId,
+      thumbnail:
+        item.snippet.thumbnails?.high?.url ||
+        item.snippet.thumbnails?.medium?.url || '',
+      publishedAt: item.snippet.publishedAt,
+      viewCount: item.liveStreamingDetails?.concurrentViewers || item.statistics?.viewCount,
+      duration: 'CANLI',
+      url: `https://www.youtube.com/watch?v=${item.id}`,
+      ytVideoId: item.id,
+      live: true,
+    }));
+
+    // Cache 15 dakika — günde max ~96 kontrol = ~9600 birim
+    await setCache(cacheKey, liveVideos, 0.25);
+    return liveVideos;
+  } catch (error) {
+    console.error('fetchLiveStreams error:', error);
+    return [];
+  }
+}
+
+// =============================================
 // MULTI-CHANNEL: Parallel fetch with smart caching
 // =============================================
 export async function getMultiChannelVideos(
@@ -302,24 +389,45 @@ export async function getMultiChannelVideos(
   const cached = await getCached(cacheKey);
   if (cached) return cached;
 
-  // Use Promise.allSettled to prevent cascade failures
-  const results = await Promise.allSettled(
-    channelIds.map((id) => fetchChannelUploads(id, apiKey, maxPerChannel))
-  );
+  // Fetch uploads AND live streams in parallel
+  const [uploadsResults, liveVideos] = await Promise.all([
+    Promise.allSettled(
+      channelIds.map((id) => fetchChannelUploads(id, apiKey, maxPerChannel))
+    ),
+    fetchLiveStreams(channelIds, apiKey),
+  ]);
 
   const allVideos: Video[] = [];
-  results.forEach((result) => {
+
+  // Add live streams first (they should appear at top)
+  allVideos.push(...liveVideos);
+
+  // Add uploads
+  uploadsResults.forEach((result) => {
     if (result.status === 'fulfilled') {
       allVideos.push(...result.value);
     }
   });
 
-  const sorted = allVideos.sort(
-    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-  );
+  // Deduplicate — live streams might also appear in uploads
+  const seen = new Set<string>();
+  const deduped = allVideos.filter((v) => {
+    const key = v.ytVideoId || v.id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 
-  // Multi-channel cache: 6 hours — kota tasarrufu
-  await setCache(cacheKey, sorted, 6);
+  // Sort: live first, then by date
+  const sorted = deduped.sort((a, b) => {
+    if (a.live && !b.live) return -1;
+    if (!a.live && b.live) return 1;
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+  });
+
+  // Multi-channel cache: 3 minutes if any live, 6 hours if no live
+  const hasLive = sorted.some(v => v.live);
+  await setCache(cacheKey, sorted, hasLive ? 0.25 : 6);
   return sorted;
 }
 

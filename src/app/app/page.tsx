@@ -325,24 +325,26 @@ function PlayerModal({
   autoplayNext: boolean;
   onAutoplayNextToggle: () => void;
 }) {
-  if (!video) return null;
-
-  const videoId = video.ytVideoId || extractVideoId(video.url);
-  const currentIdx = allVideos.findIndex((v) => v.id === video.id);
+  // ALL hooks MUST be called before any conditional return (React Rules of Hooks)
   const playerRef = useRef<any>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
   const [resumeTime, setResumeTime] = useState<number>(0);
   const [showResumeToast, setShowResumeToast] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const [playerReady, setPlayerReady] = useState(false);
+
+  const videoId = video ? (video.ytVideoId || extractVideoId(video.url)) : '';
+  const currentIdx = video ? allVideos.findIndex((v) => v.id === video.id) : -1;
 
   // Check for saved progress when video changes
   useEffect(() => {
+    if (!videoId) return;
     const saved = getVideoProgress(videoId);
     setResumeTime(saved);
     setShowResumeToast(saved > 0);
     setCountdown(null);
-    // Hide toast after 8 seconds
+    setPlayerReady(false);
     if (saved > 0) {
       const timer = setTimeout(() => setShowResumeToast(false), 8000);
       return () => clearTimeout(timer);
@@ -351,18 +353,18 @@ function PlayerModal({
 
   // Save progress periodically while playing
   useEffect(() => {
+    if (!videoId) return;
     progressIntervalRef.current = setInterval(() => {
       if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
         try {
           const time = playerRef.current.getCurrentTime();
           const duration = playerRef.current.getDuration();
-          // Don't save if near the end (within 30 seconds) or very beginning
           if (time > 5 && duration > 0 && (duration - time) > 30) {
             saveVideoProgress(videoId, time);
           }
         } catch {}
       }
-    }, 5000); // Save every 5 seconds
+    }, 5000);
 
     return () => {
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
@@ -376,8 +378,10 @@ function PlayerModal({
     };
   }, [videoId]);
 
-  // Load YouTube IFrame API
+  // Load YouTube IFrame API and create player
   useEffect(() => {
+    if (!videoId || !video) return;
+
     // Load API script if not already present
     if (!(window as any).YT) {
       const tag = document.createElement('script');
@@ -387,66 +391,84 @@ function PlayerModal({
     }
 
     const startTime = resumeTime;
+    let destroyed = false;
 
     const initPlayer = () => {
-      // Destroy previous player if exists
+      if (destroyed) return;
+
+      // Destroy previous player safely
       if (playerRef.current) {
         try { playerRef.current.destroy(); } catch {}
         playerRef.current = null;
       }
 
+      // Wait for container to be in DOM
       const container = document.getElementById('yt-player-container');
-      if (!container) return;
+      if (!container) {
+        // Retry after a short delay if container not ready
+        setTimeout(() => { if (!destroyed) initPlayer(); }, 200);
+        return;
+      }
 
-      playerRef.current = new (window as any).YT.Player('yt-player-container', {
-        videoId: videoId,
-        playerVars: {
-          autoplay: 1,
-          rel: 0,
-          modestbranding: 1,
-          start: startTime || undefined,
-        },
-        events: {
-          onStateChange: (event: any) => {
-            // YT.PlayerState.ENDED === 0
-            if (event.data === 0) {
-              // Video ended — clear saved progress
-              clearVideoProgress(videoId);
-
-              if (autoplayNext && allVideos.length > 1) {
-                // Start countdown
-                let count = 5;
-                setCountdown(count);
-                countdownRef.current = setInterval(() => {
-                  count--;
-                  setCountdown(count);
-                  if (count <= 0) {
-                    if (countdownRef.current) clearInterval(countdownRef.current);
-                    setCountdown(null);
-                    onVideoEnd();
-                  }
-                }, 1000);
-              }
-            } else if (event.data === 1) {
-              // Playing — cancel any countdown
-              if (countdownRef.current) {
-                clearInterval(countdownRef.current);
-                setCountdown(null);
-              }
-            }
+      try {
+        playerRef.current = new (window as any).YT.Player('yt-player-container', {
+          videoId: videoId,
+          width: '100%',
+          height: '100%',
+          playerVars: {
+            autoplay: 1,
+            rel: 0,
+            modestbranding: 1,
+            start: startTime || undefined,
           },
-        },
-      });
+          events: {
+            onReady: () => {
+              if (!destroyed) setPlayerReady(true);
+            },
+            onStateChange: (event: any) => {
+              if (destroyed) return;
+              if (event.data === 0) {
+                clearVideoProgress(videoId);
+                if (autoplayNext && allVideos.length > 1) {
+                  let count = 5;
+                  setCountdown(count);
+                  countdownRef.current = setInterval(() => {
+                    count--;
+                    setCountdown(count);
+                    if (count <= 0) {
+                      if (countdownRef.current) clearInterval(countdownRef.current);
+                      setCountdown(null);
+                      onVideoEnd();
+                    }
+                  }, 1000);
+                }
+              } else if (event.data === 1) {
+                if (countdownRef.current) {
+                  clearInterval(countdownRef.current);
+                  setCountdown(null);
+                }
+              }
+            },
+            onError: (event: any) => {
+              console.warn('YT Player error:', event.data);
+            },
+          },
+        });
+      } catch (err) {
+        console.warn('Failed to create YT player:', err);
+      }
     };
 
     if ((window as any).YT && (window as any).YT.Player) {
-      // Small delay to ensure DOM element is ready
-      setTimeout(initPlayer, 100);
+      setTimeout(initPlayer, 150);
     } else {
-      (window as any).onYouTubeIframeAPIReady = initPlayer;
+      (window as any).onYouTubeIframeAPIReady = () => {
+        if (!destroyed) setTimeout(initPlayer, 100);
+      };
     }
 
     return () => {
+      destroyed = true;
       if (playerRef.current) {
         try { playerRef.current.destroy(); } catch {}
         playerRef.current = null;
@@ -454,7 +476,9 @@ function PlayerModal({
     };
   }, [videoId]); // Only reinit when video changes
 
+  // Keyboard shortcuts
   useEffect(() => {
+    if (!video) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') onZap('prev');
@@ -462,7 +486,10 @@ function PlayerModal({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose, onZap]);
+  }, [video, onClose, onZap]);
+
+  // NOW we can do conditional return — AFTER all hooks
+  if (!video) return null;
 
   // Featured channels for right sidebar (exclude current)
   const featuredChannels = data.channels.filter((ch) => ch.youtubeChannelId !== video.channelId).slice(0, 3);
@@ -514,7 +541,7 @@ function PlayerModal({
 
           {/* Player — YouTube IFrame API */}
           <div className="flex-1 bg-black rounded-b-xl overflow-hidden border border-white/10 border-t-0 relative">
-            <div id="yt-player-container" key={videoId} className="w-full h-full channel-switch" />
+            <div id="yt-player-container" className="w-full h-full channel-switch" />
 
             {/* Resume Toast */}
             {showResumeToast && resumeTime > 0 && (
