@@ -117,6 +117,25 @@ function MultiViewPlayer({
   const [onlineCount] = useState(() => Math.floor(Math.random() * 2000) + 1200);
   const [zapFlash, setZapFlash] = useState(false);
   const [autoDirector, setAutoDirector] = useState(false);
+  const iframeRefs = useRef<(HTMLIFrameElement | null)[]>([]);
+
+  // iOS-safe: tüm iframe'ler muted başlar, aktif olan postMessage ile unmute edilir
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      iframeRefs.current.forEach((iframe, idx) => {
+        if (!iframe?.contentWindow) return;
+        try {
+          if (idx === activeAudioIndex) {
+            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+            iframe.contentWindow.postMessage('{"event":"command","func":"setVolume","args":[100]}', '*');
+          } else {
+            iframe.contentWindow.postMessage('{"event":"command","func":"mute","args":""}', '*');
+          }
+        } catch {}
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [activeAudioIndex, videos.length]);
 
   // Auto Director — her 30sn rastgele başka kanala geç
   useEffect(() => {
@@ -468,7 +487,8 @@ function MultiViewPlayer({
                   return (
                     <>
                       <iframe
-                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&mute=0`}
+                        ref={(el) => { iframeRefs.current[focusIndex] = el; }}
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}&mute=1`}
                         title={video.title}
                         className="w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -536,7 +556,8 @@ function MultiViewPlayer({
                       {/* Thumbnail yerine iframe — ama 5+ de thumbnail kullan (performans) */}
                       {videos.length <= 4 ? (
                         <iframe
-                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&mute=1&controls=0`}
+                          ref={(el) => { iframeRefs.current[idx] = el; }}
+                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}&mute=1&controls=0`}
                           title={video.title}
                           className="w-full h-full pointer-events-none"
                           allow="autoplay"
@@ -584,7 +605,8 @@ function MultiViewPlayer({
                     onDoubleClick={() => { setFocusIndex(idx); onAudioSwitch(idx); }}
                   >
                     <iframe
-                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&mute=${isAudioActive ? 0 : 1}`}
+                      ref={(el) => { iframeRefs.current[idx] = el; }}
+                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}&mute=1`}
                       title={video.title}
                       className="w-full h-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
