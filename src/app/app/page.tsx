@@ -2039,8 +2039,8 @@ export default function AppPage() {
               <Link href="/app/chat" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 💬 Sohbet
               </Link>
-              <Link href="/app/twitter" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-                🐦 Twitter
+              <Link href="/app/trend" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                📊 Trend
               </Link>
               <Link href="/app/channels" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 📡 Kanallar
@@ -2089,8 +2089,8 @@ export default function AppPage() {
               <Link href="/app/chat" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 💬 Sohbet
               </Link>
-              <Link href="/app/twitter" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-                🐦 Twitter
+              <Link href="/app/trend" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                📊 Trend
               </Link>
               <Link href="/app/channels" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 📡 Kanallar
