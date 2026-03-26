@@ -111,7 +111,40 @@ function MultiViewPlayer({
   onClose: () => void;
   onRemoveVideo: (idx: number) => void;
 }) {
+  // Keyboard navigation — ok tuşlarıyla ses geçişi, ESC ile kapat
+  useEffect(() => {
+    if (videos.length === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        onAudioSwitch((activeAudioIndex + 1) % videos.length);
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        onAudioSwitch((activeAudioIndex - 1 + videos.length) % videos.length);
+      } else if (e.key >= '1' && e.key <= '4') {
+        const idx = parseInt(e.key) - 1;
+        if (idx < videos.length) {
+          e.preventDefault();
+          onAudioSwitch(idx);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [videos.length, activeAudioIndex, onAudioSwitch, onClose]);
+
   if (videos.length === 0) return null;
+
+  // Grid layout — 1: full, 2: 2 sütun, 3: 2+1, 4: 2x2
+  const gridClass =
+    videos.length === 1 ? 'grid-cols-1' :
+    videos.length === 3 ? 'grid-cols-2' :
+    'grid-cols-2';
+  const gridRows =
+    videos.length <= 2 ? 'grid-rows-1' : 'grid-rows-2';
 
   return (
     <div className="fixed inset-0 z-[100] animate-fade-in" style={{ background: 'rgba(0,0,0,0.95)' }}>
@@ -123,6 +156,7 @@ function MultiViewPlayer({
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium">
             {videos.length} kanal
           </span>
+          <span className="text-[10px] text-gray-600 hidden sm:block">← → ok tuşlarıyla ses değiştir | 1-{videos.length} numara tuşları | ESC kapat</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-gray-500">🔊 Ses: {videos[activeAudioIndex]?.channelTitle}</span>
@@ -132,14 +166,16 @@ function MultiViewPlayer({
         </div>
       </div>
 
-      {/* Video Grid */}
-      <div className={`grid h-[calc(100vh-56px)] ${videos.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-1 p-1`}>
+      {/* Video Grid — tüm ekranı kapla */}
+      <div className={`grid h-[calc(100vh-56px)] ${gridClass} ${gridRows} gap-1 p-1`}>
         {videos.map((video, idx) => {
           const videoId = video.ytVideoId || extractVideoId(video.url);
           const isAudioActive = idx === activeAudioIndex;
+          // 3 video varsa son video tam genişlik alsın
+          const spanClass = videos.length === 3 && idx === 2 ? 'col-span-2' : '';
 
           return (
-            <div key={video.id} className="relative group">
+            <div key={video.id} className={`relative group ${spanClass}`}>
               <iframe
                 src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=${isAudioActive ? 0 : 1}`}
                 title={video.title}
@@ -174,12 +210,17 @@ function MultiViewPlayer({
                   </div>
                 </div>
               </div>
-              {/* Audio indicator */}
-              {isAudioActive && (
-                <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-400 text-[10px] font-bold">
-                  🔊 SES
-                </div>
-              )}
+              {/* Audio indicator + kanal numarası */}
+              <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                <span className="px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-bold">
+                  {idx + 1}
+                </span>
+                {isAudioActive && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-400 text-[10px] font-bold">
+                    🔊 SES
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
@@ -720,12 +761,22 @@ function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]
           )}
         </h3>
         {liveVideos.length >= 2 && (
-          <button
-            onClick={() => onMultiView(liveVideos.slice(0, 2))}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors"
-          >
-            📺 Çoklu İzle ({Math.min(liveVideos.length, 2)})
-          </button>
+          <div className="flex items-center gap-2">
+            {liveVideos.length > 2 && (
+              <button
+                onClick={() => onMultiView(liveVideos.slice(0, 2))}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/5 text-gray-400 text-xs font-medium hover:bg-white/10 transition-colors"
+              >
+                📺 2'li İzle
+              </button>
+            )}
+            <button
+              onClick={() => onMultiView(liveVideos.slice(0, 4))}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors"
+            >
+              📺 Hepsini İzle ({Math.min(liveVideos.length, 4)})
+            </button>
+          </div>
         )}
       </div>
 
