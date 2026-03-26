@@ -1,10 +1,92 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import sponsors from '@/data/sponsors.json';
+
+declare global {
+  interface Window {
+    adsbygoogle: any[];
+  }
+}
 
 interface AdBannerProps {
   slot: 'sidebar' | 'player-bottom' | 'chat-top' | 'stats-inline' | 'preroll' | 'stream-bottom';
   className?: string;
+}
+
+// Google AdSense fallback component — sponsor yoksa bunu göster
+function AdSenseFallback({ slot, className = '' }: { slot: string; className?: string }) {
+  const adRef = useRef<HTMLModElement>(null);
+  const pushed = useRef(false);
+
+  const adsenseId = process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID;
+
+  useEffect(() => {
+    if (!adsenseId) return;
+    if (pushed.current) return;
+
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+      pushed.current = true;
+    } catch (e) {
+      console.error('AdSense push error:', e);
+    }
+  }, [adsenseId]);
+
+  if (!adsenseId) {
+    // AdSense ID yoksa placeholder göster
+    return (
+      <div
+        className={`flex items-center justify-center border border-dashed border-gray-700 bg-slate-900/50 text-gray-500 rounded-lg ${className}`}
+        style={{
+          width: '100%',
+          height: slot === 'sidebar' ? '250px' : '70px',
+          maxWidth: slot === 'sidebar' ? '300px' : '728px',
+        }}
+      >
+        <div className="text-center">
+          <p className="text-xs font-medium">Reklam Alanı</p>
+          <p className="text-[10px] mt-0.5 text-gray-600">Sponsor olun — info@zaptube.today</p>
+        </div>
+      </div>
+    );
+  }
+
+  // AdSense slot mapping — gerçek ad unit ID'leri Vercel env'e eklenince değiştirilecek
+  const adSlotMap: Record<string, string> = {
+    'sidebar': process.env.NEXT_PUBLIC_AD_SLOT_SIDEBAR || '',
+    'player-bottom': process.env.NEXT_PUBLIC_AD_SLOT_PLAYER || '',
+    'chat-top': process.env.NEXT_PUBLIC_AD_SLOT_CHAT || '',
+    'stats-inline': process.env.NEXT_PUBLIC_AD_SLOT_STATS || '',
+    'stream-bottom': process.env.NEXT_PUBLIC_AD_SLOT_STREAM || '',
+  };
+
+  const formatMap: Record<string, string> = {
+    'sidebar': 'rectangle',
+    'player-bottom': 'horizontal',
+    'chat-top': 'horizontal',
+    'stats-inline': 'horizontal',
+    'stream-bottom': 'horizontal',
+  };
+
+  return (
+    <div className={`flex justify-center ${className}`}>
+      <ins
+        ref={adRef}
+        className="adsbygoogle"
+        style={{
+          display: 'block',
+          width: '100%',
+          height: slot === 'sidebar' ? '250px' : '70px',
+          maxWidth: slot === 'sidebar' ? '300px' : '728px',
+        }}
+        data-ad-client={adsenseId}
+        data-ad-slot={adSlotMap[slot] || ''}
+        data-ad-format={formatMap[slot] || 'auto'}
+        data-full-width-responsive="true"
+      />
+    </div>
+  );
 }
 
 export default function AdBanner({ slot, className = '' }: AdBannerProps) {
@@ -12,11 +94,14 @@ export default function AdBanner({ slot, className = '' }: AdBannerProps) {
     return null;
   }
 
-  const sponsor = sponsors.sponsors.find((s) => s.slot === slot && s.active)
-    || sponsors.sponsors.find((s) => s.active); // fallback to any active sponsor
+  // Önce sponsor ara — direkt sponsor varsa onu göster
+  const sponsor = sponsors.sponsors.find((s) => s.slot === slot && s.active);
 
   // ========== STREAM BOTTOM — ince uzun banner, video altı ==========
   if (slot === 'stream-bottom') {
+    if (!sponsor) {
+      return <AdSenseFallback slot={slot} className={className} />;
+    }
     return (
       <div
         className={`w-full rounded-lg overflow-hidden ${className}`}
@@ -24,59 +109,34 @@ export default function AdBanner({ slot, className = '' }: AdBannerProps) {
           background: 'linear-gradient(90deg, #0c1a2e 0%, #162033 30%, #1a2744 60%, #0f1b2e 100%)',
         }}
       >
-        {sponsor ? (
-          <a
-            href={sponsor.link}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="flex items-center justify-between px-4 py-2 group hover:opacity-90 transition-opacity"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <img
-                src={sponsor.image}
-                alt={sponsor.name}
-                className="h-6 w-6 object-contain rounded"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              />
-              <span className="text-xs font-bold text-white truncate">{sponsor.name}</span>
-              <span className="text-[10px] text-gray-400 truncate hidden sm:inline">{sponsor.tagline}</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[9px] text-gray-500 uppercase tracking-wider">Sponsor</span>
-              <span className="text-xs text-blue-400 group-hover:text-blue-300 transition-colors">Ziyaret Et →</span>
-            </div>
-          </a>
-        ) : (
-          <div className="flex items-center justify-between px-4 py-2">
-            <div className="flex items-center gap-3">
-              <div className="h-6 w-6 bg-gray-700 rounded flex items-center justify-center">
-                <span className="text-[8px] text-gray-400">AD</span>
-              </div>
-              <span className="text-xs text-gray-500">Reklam Alanı — Sponsor olun</span>
-            </div>
-            <span className="text-[9px] text-gray-600 uppercase tracking-wider">Reklam</span>
+        <a
+          href={sponsor.link}
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="flex items-center justify-between px-4 py-2 group hover:opacity-90 transition-opacity"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src={sponsor.image}
+              alt={sponsor.name}
+              className="h-6 w-6 object-contain rounded"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+            <span className="text-xs font-bold text-white truncate">{sponsor.name}</span>
+            <span className="text-[10px] text-gray-400 truncate hidden sm:inline">{sponsor.tagline}</span>
           </div>
-        )}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[9px] text-gray-500 uppercase tracking-wider">Sponsor</span>
+            <span className="text-xs text-blue-400 group-hover:text-blue-300 transition-colors">Ziyaret Et →</span>
+          </div>
+        </a>
       </div>
     );
   }
 
+  // Sponsor yoksa → Google AdSense fallback
   if (!sponsor) {
-    return (
-      <div
-        className={`flex items-center justify-center border-2 border-dashed border-gray-600 bg-slate-900 text-gray-400 rounded-lg ${className}`}
-        style={{
-          width: slot === 'sidebar' ? '100%' : '100%',
-          height: slot === 'sidebar' ? '200px' : '70px',
-          maxWidth: slot === 'sidebar' ? '300px' : '728px',
-        }}
-      >
-        <div className="text-center">
-          <p className="text-sm font-medium">Reklam Alanı</p>
-          <p className="text-xs mt-1">Google AdSense</p>
-        </div>
-      </div>
-    );
+    return <AdSenseFallback slot={slot} className={className} />;
   }
 
   if (slot === 'sidebar') {
