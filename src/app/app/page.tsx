@@ -624,30 +624,14 @@ function PlayerModal({
             </div>
           </div>
 
-          {/* Öne Çıkan Kanallar */}
-          <div className="bg-[#111827] rounded-xl border border-white/10 overflow-hidden flex-1">
-            <div className="px-3 py-2 border-b border-white/10">
-              <p className="text-[11px] font-bold text-white tracking-wider uppercase">ÖNE ÇIKAN KANALLAR</p>
+          {/* Twitter Akışı + Sponsor */}
+          <div className="flex-1 flex flex-col gap-1 min-h-0">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Tweet Akışı Sponsoru</span>
+              <span className="text-[10px] text-yellow-500/60 font-medium">REKLAM</span>
             </div>
-            <div className="p-2 space-y-1">
-              {featuredChannels.map((ch) => (
-                <button
-                  key={ch.id}
-                  onClick={() => {
-                    const chVideo = allVideos.find((v) => v.channelId === ch.youtubeChannelId);
-                    if (chVideo) onZap('next');
-                  }}
-                  className="flex items-center gap-2 w-full p-2 rounded-lg hover:bg-white/5 transition-colors text-left group"
-                >
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden">
-                    {ch.name[0]}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-white truncate group-hover:text-yellow-400 transition-colors">{ch.name}</p>
-                    <p className="text-[10px] text-gray-600 truncate">{ch.description.substring(0, 35)}...</p>
-                  </div>
-                </button>
-              ))}
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <TwitterFeedWidget />
             </div>
           </div>
         </div>
@@ -704,24 +688,13 @@ function SponsorSidebar() {
         </div>
       </div>
 
-      {/* Featured Channels */}
-      <div className="bg-[#1e293b] rounded-xl p-3 border border-white/5">
-        <h4 className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-2">
-          ⭐ Öne Çıkan Kanallar
-        </h4>
-        <div className="space-y-2">
-          {data.channels.slice(0, 3).map((ch) => (
-            <button key={ch.id} className="flex items-center gap-2 w-full p-1.5 rounded-lg hover:bg-white/5 transition-colors text-left">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center text-xs font-bold shrink-0">
-                {ch.name[0]}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-white truncate">{ch.name}</p>
-                <p className="text-[10px] text-gray-500 truncate">{ch.description.substring(0, 40)}...</p>
-              </div>
-            </button>
-          ))}
+      {/* Twitter Feed with Sponsor */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Tweet Akışı Sponsoru</span>
+          <span className="text-[10px] text-yellow-500/60 font-medium">REKLAM</span>
         </div>
+        <TwitterFeedWidget />
       </div>
 
       {/* Sponsor Ad Banner */}
