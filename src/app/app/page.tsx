@@ -468,7 +468,7 @@ function MultiViewPlayer({
                   return (
                     <>
                       <iframe
-                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=0`}
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&mute=0`}
                         title={video.title}
                         className="w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -536,7 +536,7 @@ function MultiViewPlayer({
                       {/* Thumbnail yerine iframe — ama 5+ de thumbnail kullan (performans) */}
                       {videos.length <= 4 ? (
                         <iframe
-                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=1&controls=0`}
+                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&mute=1&controls=0`}
                           title={video.title}
                           className="w-full h-full pointer-events-none"
                           allow="autoplay"
@@ -584,7 +584,7 @@ function MultiViewPlayer({
                     onDoubleClick={() => { setFocusIndex(idx); onAudioSwitch(idx); }}
                   >
                     <iframe
-                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&mute=${isAudioActive ? 0 : 1}`}
+                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&mute=${isAudioActive ? 0 : 1}`}
                       title={video.title}
                       className="w-full h-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -902,21 +902,44 @@ function PlayerModal({
     };
   }, [videoId]);
 
-  // Load YouTube IFrame API and create player
-  useEffect(() => {
-    if (!videoId || !video) return;
+  // Load YouTube IFrame API once
+  const playerInitialized = useRef(false);
+  const currentVideoIdRef = useRef('');
 
-    // Load API script if not already present
+  useEffect(() => {
     if (!(window as any).YT) {
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
       const firstScript = document.getElementsByTagName('script')[0];
       firstScript?.parentNode?.insertBefore(tag, firstScript);
     }
+  }, []);
 
-    const startTime = resumeTime;
+  // Create player once, then use loadVideoById for subsequent videos (iOS autoplay fix)
+  useEffect(() => {
+    if (!videoId || !video) return;
+
     let destroyed = false;
+    const startTime = resumeTime;
 
+    // If player already exists and is ready, just switch video (no destroy!)
+    if (playerRef.current && playerInitialized.current && currentVideoIdRef.current !== videoId) {
+      currentVideoIdRef.current = videoId;
+      try {
+        if (startTime > 0) {
+          playerRef.current.loadVideoById({ videoId, startSeconds: startTime });
+        } else {
+          playerRef.current.loadVideoById(videoId);
+        }
+        setPlayerReady(true);
+      } catch {
+        // If loadVideoById fails, fall through to recreate
+        playerInitialized.current = false;
+      }
+      if (playerInitialized.current) return; // Successfully switched
+    }
+
+    // First time or recovery: create the player
     const initPlayer = () => {
       if (destroyed) return;
 
@@ -924,17 +947,17 @@ function PlayerModal({
       if (playerRef.current) {
         try { playerRef.current.destroy(); } catch {}
         playerRef.current = null;
+        playerInitialized.current = false;
       }
 
-      // Wait for container to be in DOM
       const container = document.getElementById('yt-player-container');
       if (!container) {
-        // Retry after a short delay if container not ready
         setTimeout(() => { if (!destroyed) initPlayer(); }, 200);
         return;
       }
 
       try {
+        currentVideoIdRef.current = videoId;
         playerRef.current = new (window as any).YT.Player('yt-player-container', {
           videoId: videoId,
           width: '100%',
@@ -943,16 +966,20 @@ function PlayerModal({
             autoplay: 1,
             rel: 0,
             modestbranding: 1,
+            playsinline: 1,
             start: startTime || undefined,
           },
           events: {
             onReady: () => {
-              if (!destroyed) setPlayerReady(true);
+              if (!destroyed) {
+                setPlayerReady(true);
+                playerInitialized.current = true;
+              }
             },
             onStateChange: (event: any) => {
               if (destroyed) return;
               if (event.data === 0) {
-                clearVideoProgress(videoId);
+                clearVideoProgress(currentVideoIdRef.current);
                 if (autoplayNext && allVideos.length > 1) {
                   let count = 5;
                   setCountdown(count);
@@ -993,12 +1020,20 @@ function PlayerModal({
 
     return () => {
       destroyed = true;
-      if (playerRef.current) {
-        try { playerRef.current.destroy(); } catch {}
-        playerRef.current = null;
-      }
+      // Don't destroy player on video change — reuse it!
+      // Only destroy when component unmounts (video becomes null)
     };
-  }, [videoId]); // Only reinit when video changes
+  }, [videoId]); // Switch video without destroying player
+
+  // Cleanup player when modal closes
+  useEffect(() => {
+    if (!video && playerRef.current) {
+      try { playerRef.current.destroy(); } catch {}
+      playerRef.current = null;
+      playerInitialized.current = false;
+      currentVideoIdRef.current = '';
+    }
+  }, [video]);
 
   // Keyboard shortcuts
   useEffect(() => {
