@@ -267,21 +267,192 @@ function GlobalSohbet() {
 // SINGLE PLAYER MODAL — Mockup-style layout
 // Left: Chat | Center: Player | Right: Betting+Channels
 // =============================================
+// =============================================
+// RESUME HELPERS — localStorage ile kaldığın yerden devam
+// =============================================
+const RESUME_STORAGE_KEY = 'zaptube_resume';
+
+function saveVideoProgress(videoId: string, currentTime: number) {
+  try {
+    const data = JSON.parse(localStorage.getItem(RESUME_STORAGE_KEY) || '{}');
+    data[videoId] = { time: Math.floor(currentTime), updatedAt: Date.now() };
+    // Keep only last 50 entries
+    const entries = Object.entries(data);
+    if (entries.length > 50) {
+      const sorted = entries.sort((a: any, b: any) => b[1].updatedAt - a[1].updatedAt);
+      const trimmed = Object.fromEntries(sorted.slice(0, 50));
+      localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(trimmed));
+    } else {
+      localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(data));
+    }
+  } catch {}
+}
+
+function getVideoProgress(videoId: string): number {
+  try {
+    const data = JSON.parse(localStorage.getItem(RESUME_STORAGE_KEY) || '{}');
+    const entry = data[videoId];
+    if (entry && entry.time > 10) {
+      // Only resume if > 10 seconds in (skip intros etc)
+      return entry.time;
+    }
+  } catch {}
+  return 0;
+}
+
+function clearVideoProgress(videoId: string) {
+  try {
+    const data = JSON.parse(localStorage.getItem(RESUME_STORAGE_KEY) || '{}');
+    delete data[videoId];
+    localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(data));
+  } catch {}
+}
+
 function PlayerModal({
   video,
   onClose,
   allVideos,
   onZap,
+  onVideoEnd,
+  autoplayNext,
+  onAutoplayNextToggle,
 }: {
   video: Video | null;
   onClose: () => void;
   allVideos: Video[];
   onZap: (direction: 'prev' | 'next') => void;
+  onVideoEnd: () => void;
+  autoplayNext: boolean;
+  onAutoplayNextToggle: () => void;
 }) {
   if (!video) return null;
 
   const videoId = video.ytVideoId || extractVideoId(video.url);
   const currentIdx = allVideos.findIndex((v) => v.id === video.id);
+  const playerRef = useRef<any>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [resumeTime, setResumeTime] = useState<number>(0);
+  const [showResumeToast, setShowResumeToast] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check for saved progress when video changes
+  useEffect(() => {
+    const saved = getVideoProgress(videoId);
+    setResumeTime(saved);
+    setShowResumeToast(saved > 0);
+    setCountdown(null);
+    // Hide toast after 8 seconds
+    if (saved > 0) {
+      const timer = setTimeout(() => setShowResumeToast(false), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [videoId]);
+
+  // Save progress periodically while playing
+  useEffect(() => {
+    progressIntervalRef.current = setInterval(() => {
+      if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+        try {
+          const time = playerRef.current.getCurrentTime();
+          const duration = playerRef.current.getDuration();
+          // Don't save if near the end (within 30 seconds) or very beginning
+          if (time > 5 && duration > 0 && (duration - time) > 30) {
+            saveVideoProgress(videoId, time);
+          }
+        } catch {}
+      }
+    }, 5000); // Save every 5 seconds
+
+    return () => {
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    };
+  }, [videoId]);
+
+  // Cleanup countdown on unmount or video change
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [videoId]);
+
+  // Load YouTube IFrame API
+  useEffect(() => {
+    // Load API script if not already present
+    if (!(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScript = document.getElementsByTagName('script')[0];
+      firstScript?.parentNode?.insertBefore(tag, firstScript);
+    }
+
+    const startTime = resumeTime;
+
+    const initPlayer = () => {
+      // Destroy previous player if exists
+      if (playerRef.current) {
+        try { playerRef.current.destroy(); } catch {}
+        playerRef.current = null;
+      }
+
+      const container = document.getElementById('yt-player-container');
+      if (!container) return;
+
+      playerRef.current = new (window as any).YT.Player('yt-player-container', {
+        videoId: videoId,
+        playerVars: {
+          autoplay: 1,
+          rel: 0,
+          modestbranding: 1,
+          start: startTime || undefined,
+        },
+        events: {
+          onStateChange: (event: any) => {
+            // YT.PlayerState.ENDED === 0
+            if (event.data === 0) {
+              // Video ended — clear saved progress
+              clearVideoProgress(videoId);
+
+              if (autoplayNext && allVideos.length > 1) {
+                // Start countdown
+                let count = 5;
+                setCountdown(count);
+                countdownRef.current = setInterval(() => {
+                  count--;
+                  setCountdown(count);
+                  if (count <= 0) {
+                    if (countdownRef.current) clearInterval(countdownRef.current);
+                    setCountdown(null);
+                    onVideoEnd();
+                  }
+                }, 1000);
+              }
+            } else if (event.data === 1) {
+              // Playing — cancel any countdown
+              if (countdownRef.current) {
+                clearInterval(countdownRef.current);
+                setCountdown(null);
+              }
+            }
+          },
+        },
+      });
+    };
+
+    if ((window as any).YT && (window as any).YT.Player) {
+      // Small delay to ensure DOM element is ready
+      setTimeout(initPlayer, 100);
+    } else {
+      (window as any).onYouTubeIframeAPIReady = initPlayer;
+    }
+
+    return () => {
+      if (playerRef.current) {
+        try { playerRef.current.destroy(); } catch {}
+        playerRef.current = null;
+      }
+    };
+  }, [videoId]); // Only reinit when video changes
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -341,16 +512,56 @@ function PlayerModal({
             </div>
           </div>
 
-          {/* Player iframe */}
+          {/* Player — YouTube IFrame API */}
           <div className="flex-1 bg-black rounded-b-xl overflow-hidden border border-white/10 border-t-0 relative">
-            <iframe
-              key={videoId}
-              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
-              title={video.title}
-              className="w-full h-full channel-switch"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
+            <div id="yt-player-container" key={videoId} className="w-full h-full channel-switch" />
+
+            {/* Resume Toast */}
+            {showResumeToast && resumeTime > 0 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-xl bg-black/80 border border-emerald-500/30 backdrop-blur-sm animate-fade-in z-10">
+                <span className="text-emerald-400 text-sm">▶</span>
+                <span className="text-xs text-gray-300">
+                  Kaldığın yerden devam: <span className="text-white font-bold">{Math.floor(resumeTime / 60)}:{String(resumeTime % 60).padStart(2, '0')}</span>
+                </span>
+              </div>
+            )}
+
+            {/* Autoplay Next Countdown */}
+            {countdown !== null && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-20 animate-fade-in">
+                <div className="text-center">
+                  <p className="text-sm text-gray-400 mb-2">Sonraki video başlıyor...</p>
+                  <div className="w-20 h-20 rounded-full border-4 border-emerald-500 flex items-center justify-center mb-3">
+                    <span className="text-3xl font-bold text-white">{countdown}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-3">
+                    {currentIdx + 1 < allVideos.length ? allVideos[currentIdx + 1]?.title?.slice(0, 50) : allVideos[0]?.title?.slice(0, 50)}...
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (countdownRef.current) clearInterval(countdownRef.current);
+                      setCountdown(null);
+                    }}
+                    className="px-4 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-gray-300 transition-colors"
+                  >
+                    İptal
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Autoplay Next Toggle */}
+          <div className="flex items-center justify-between bg-[#111827] rounded-xl px-3 py-1.5 mt-1 border border-white/5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🔄</span>
+              <span className="text-[11px] text-gray-400">Otomatik Sonraki Video</span>
+            </div>
+            <button
+              onClick={onAutoplayNextToggle}
+              className={`relative w-10 h-5 rounded-full transition-colors ${autoplayNext ? 'bg-emerald-500' : 'bg-gray-700'}`}
+            >
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${autoplayNext ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
           </div>
           {/* İnce uzun sponsor banner — video altı */}
           <AdBanner slot="stream-bottom" className="mt-1" />
@@ -638,6 +849,9 @@ export default function AppPage() {
   const [autoZapActive, setAutoZapActive] = useState(false);
   const autoZapRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Autoplay next video state
+  const [autoplayNext, setAutoplayNext] = useState(true); // default ON
+
   // TV Mode — auto-open on load
   const [tvBooted, setTvBooted] = useState(false);
   const [tvBootAnim, setTvBootAnim] = useState(true); // boot-up animation
@@ -834,6 +1048,9 @@ export default function AppPage() {
         }}
         allVideos={allVideos}
         onZap={handleZap}
+        onVideoEnd={() => handleZap('next')}
+        autoplayNext={autoplayNext}
+        onAutoplayNextToggle={() => setAutoplayNext(!autoplayNext)}
       />
 
       {/* Multi-View Player */}
