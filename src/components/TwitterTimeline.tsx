@@ -1,7 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import Script from 'next/script';
+import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
+
+// react-twitter-embed — widgets.js wrapper with better React lifecycle handling
+const TwitterTimelineEmbed = dynamic(
+  () => import('react-twitter-embed').then(mod => mod.TwitterTimelineEmbed),
+  { ssr: false }
+);
 
 // Türk futbol dünyasının sürekli tweet atan yüksek takipçili hesapları
 const FOOTBALL_ACCOUNTS = [
@@ -10,7 +16,7 @@ const FOOTBALL_ACCOUNTS = [
   { handle: 'Fenerbahce', name: 'Fenerbahçe', team: 'fenerbahce', category: 'club', emoji: '💛💙' },
   { handle: 'Besiktas', name: 'Beşiktaş', team: 'besiktas', category: 'club', emoji: '⚫⚪' },
   { handle: 'Trabzonspor', name: 'Trabzonspor', team: 'trabzonspor', category: 'club', emoji: '🔵🟤' },
-  // === SPOR MEDYASI — sürekli haber akışı ===
+  // === SPOR MEDYASI ===
   { handle: 'futbolarena', name: 'FutbolArena', team: 'genel', category: 'media', emoji: '📰' },
   { handle: 'sporarena', name: 'Spor Arena', team: 'genel', category: 'media', emoji: '📰' },
   { handle: 'ASpor', name: 'A Spor', team: 'genel', category: 'media', emoji: '📺' },
@@ -30,43 +36,8 @@ const FOOTBALL_ACCOUNTS = [
   { handle: 'TFF_Org', name: 'TFF', team: 'genel', category: 'official', emoji: '🇹🇷' },
 ];
 
-// Global flag — widgets.js yüklendi mi?
-let widgetsReady = false;
-const readyCallbacks: (() => void)[] = [];
-
-function onWidgetsReady(cb: () => void) {
-  if (widgetsReady) {
-    cb();
-  } else {
-    readyCallbacks.push(cb);
-  }
-}
-
-// Bu component sayfada bir kez widgets.js'i yükler
-export function TwitterWidgetsScript() {
-  return (
-    <Script
-      src="https://platform.twitter.com/widgets.js"
-      strategy="lazyOnload"
-      onLoad={() => {
-        const check = setInterval(() => {
-          const twttr = (window as any).twttr;
-          if (twttr?.widgets) {
-            clearInterval(check);
-            widgetsReady = true;
-            readyCallbacks.forEach(cb => cb());
-            readyCallbacks.length = 0;
-          }
-        }, 100);
-        setTimeout(() => clearInterval(check), 15000);
-      }}
-    />
-  );
-}
-
 interface TwitterTimelineProps {
   handle?: string;
-  listUrl?: string;
   height?: number;
   theme?: 'dark' | 'light';
   showSelector?: boolean;
@@ -76,7 +47,6 @@ interface TwitterTimelineProps {
 
 export default function TwitterTimeline({
   handle,
-  listUrl,
   height = 500,
   theme = 'dark',
   showSelector = false,
@@ -84,8 +54,8 @@ export default function TwitterTimeline({
   title,
 }: TwitterTimelineProps) {
   const [selectedHandle, setSelectedHandle] = useState(handle || FOOTBALL_ACCOUNTS[0].handle);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [embedKey, setEmbedKey] = useState(0);
+  const [showFallback, setShowFallback] = useState(false);
 
   const embedHandle = handle || selectedHandle;
 
@@ -93,79 +63,17 @@ export default function TwitterTimeline({
     if (handle) setSelectedHandle(handle);
   }, [handle]);
 
-  // Embed the timeline using Twitter's official method
-  const renderTimeline = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    setStatus('loading');
-
-    // Clear previous content
-    container.innerHTML = '';
-
-    const twttr = (window as any).twttr;
-    if (!twttr?.widgets?.createTimeline) {
-      // Fallback: inject anchor tag and let widgets.js handle it
-      const embedUrl = listUrl || `https://twitter.com/${embedHandle}`;
-      container.innerHTML = `<a class="twitter-timeline" data-height="${height}" data-theme="${theme}" data-chrome="noheader nofooter" data-lang="tr" data-dnt="true" href="${embedUrl}?ref_src=twsrc%5Etfw">@${embedHandle} tweetleri</a>`;
-
-      if (twttr?.widgets?.load) {
-        twttr.widgets.load(container);
-      }
-
-      // Check if rendered
-      setTimeout(() => {
-        if (container.querySelector('iframe')) {
-          setStatus('loaded');
-        } else {
-          setStatus('error');
-        }
-      }, 8000);
-      return;
-    }
-
-    // Use createTimeline API (preferred)
-    twttr.widgets.createTimeline(
-      { sourceType: 'profile', screenName: embedHandle },
-      container,
-      {
-        height: height,
-        theme: theme,
-        chrome: 'noheader nofooter',
-        lang: 'tr',
-        dnt: true,
-      }
-    ).then((el: any) => {
-      if (el) {
-        setStatus('loaded');
-      } else {
-        // createTimeline returned null — try anchor fallback
-        const embedUrl = listUrl || `https://twitter.com/${embedHandle}`;
-        container.innerHTML = `<a class="twitter-timeline" data-height="${height}" data-theme="${theme}" data-chrome="noheader nofooter" data-lang="tr" href="${embedUrl}?ref_src=twsrc%5Etfw">@${embedHandle}</a>`;
-        twttr.widgets.load(container);
-        setTimeout(() => {
-          setStatus(container.querySelector('iframe') ? 'loaded' : 'error');
-        }, 8000);
-      }
-    }).catch(() => {
-      setStatus('error');
-    });
-  }, [embedHandle, listUrl, height, theme]);
-
-  // Render when widgets.js is ready or handle changes
+  // Timeout — eğer 12 saniye içinde yüklenmezse fallback göster
   useEffect(() => {
-    onWidgetsReady(() => {
-      renderTimeline();
-    });
-  }, [renderTimeline]);
+    setShowFallback(false);
+    const timer = setTimeout(() => setShowFallback(true), 12000);
+    return () => clearTimeout(timer);
+  }, [embedHandle, embedKey]);
 
   const currentAccount = FOOTBALL_ACCOUNTS.find(a => a.handle === selectedHandle);
 
   return (
     <div className="rounded-xl border border-white/10 overflow-hidden bg-[#1e293b]">
-      {/* Widgets.js Script — rendered once globally */}
-      <TwitterWidgetsScript />
-
       {/* Header */}
       <div className="px-4 py-3 border-b border-white/10 bg-[#111827]/80">
         <div className="flex items-center justify-between">
@@ -193,7 +101,11 @@ export default function TwitterTimeline({
             {FOOTBALL_ACCOUNTS.map((account) => (
               <button
                 key={account.handle}
-                onClick={() => setSelectedHandle(account.handle)}
+                onClick={() => {
+                  setSelectedHandle(account.handle);
+                  setEmbedKey(prev => prev + 1);
+                  setShowFallback(false);
+                }}
                 className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
                   selectedHandle === account.handle
                     ? 'bg-[#1DA1F2] text-white shadow-lg shadow-[#1DA1F2]/20'
@@ -207,33 +119,54 @@ export default function TwitterTimeline({
         </div>
       )}
 
-      {/* Timeline Container */}
-      <div className="relative" style={{ minHeight: height }}>
-        {/* Loading overlay */}
-        {status === 'loading' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 z-10 bg-[#1e293b]">
-            <div className="w-8 h-8 border-2 border-[#1DA1F2] border-t-transparent rounded-full animate-spin mb-3"></div>
-            <p className="text-sm">Twitter yükleniyor...</p>
-          </div>
-        )}
+      {/* Timeline */}
+      <div style={{ minHeight: compact ? 300 : height }} className="relative">
+        {/* react-twitter-embed component */}
+        <div key={`${embedHandle}-${embedKey}`}>
+          <TwitterTimelineEmbed
+            sourceType="profile"
+            screenName={embedHandle}
+            options={{
+              height: compact ? 300 : height,
+              theme: theme,
+              chrome: 'noheader nofooter noborders',
+              lang: 'tr',
+              dnt: true,
+            }}
+            noHeader
+            noFooter
+            noBorders
+            noScrollbar={false}
+            placeholder={
+              <div className="flex flex-col items-center justify-center text-gray-400 py-12">
+                <div className="w-8 h-8 border-2 border-[#1DA1F2] border-t-transparent rounded-full animate-spin mb-3"></div>
+                <p className="text-sm">Twitter yükleniyor...</p>
+                <p className="text-xs text-gray-600 mt-1">X'e giriş yapılması gerekebilir</p>
+              </div>
+            }
+          />
+        </div>
 
-        {/* Error fallback */}
-        {status === 'error' && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-4 z-10 bg-[#1e293b]">
-            <svg viewBox="0 0 24 24" className="w-8 h-8 fill-current text-gray-600 mb-3" aria-hidden="true">
+        {/* Fallback — eğer embed yüklenmezse profil linkleri göster */}
+        {showFallback && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-4 bg-[#1e293b]/95 z-20">
+            <svg viewBox="0 0 24 24" className="w-10 h-10 fill-current text-gray-600 mb-3" aria-hidden="true">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
             </svg>
-            <p className="text-gray-400 text-sm mb-3 text-center">Twitter embed yüklenemedi</p>
+            <p className="text-gray-300 text-sm mb-1 font-medium">Twitter timeline yüklenemedi</p>
+            <p className="text-gray-500 text-xs mb-4 text-center">
+              X'e tarayıcınızdan giriş yaparsanız tweetler görünür
+            </p>
             <a
               href={`https://x.com/${embedHandle}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 bg-[#1DA1F2] text-white rounded-full text-sm hover:bg-[#1DA1F2]/80 transition-colors"
+              className="px-5 py-2 bg-[#1DA1F2] text-white rounded-full text-sm font-medium hover:bg-[#1DA1F2]/80 transition-colors mb-4"
             >
-              @{embedHandle} profilini X'te aç ↗
+              @{embedHandle} profilini X'te aç
             </a>
-            <div className="flex flex-wrap gap-2 justify-center max-w-xs mt-4">
-              {FOOTBALL_ACCOUNTS.slice(0, 6).map(acc => (
+            <div className="flex flex-wrap gap-2 justify-center max-w-sm">
+              {FOOTBALL_ACCOUNTS.filter(a => a.category === 'club').map(acc => (
                 <a
                   key={acc.handle}
                   href={`https://x.com/${acc.handle}`}
@@ -241,21 +174,18 @@ export default function TwitterTimeline({
                   rel="noopener noreferrer"
                   className="px-3 py-1.5 bg-white/5 rounded-full text-xs text-gray-400 hover:bg-white/10 hover:text-[#1DA1F2] transition-colors"
                 >
-                  {acc.emoji} @{acc.handle}
+                  {acc.emoji} {acc.name}
                 </a>
               ))}
             </div>
           </div>
         )}
-
-        {/* Twitter embed renders here */}
-        <div ref={containerRef} className="twitter-embed-container" />
       </div>
     </div>
   );
 }
 
-// Sidebar widget — compact with selector
+// Sidebar widget
 export function TwitterFeedWidget() {
   return (
     <TwitterTimeline
