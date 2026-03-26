@@ -17,6 +17,7 @@ import PollWidget from '@/components/PollWidget';
 import LiveScoreWidget from '@/components/LiveScoreWidget';
 import StandingsWidget from '@/components/StandingsWidget';
 import FixturesWidget from '@/components/FixturesWidget';
+import { TwitterFeedWidget } from '@/components/TwitterTimeline';
 
 const data = channelData as ChannelData;
 
@@ -1326,6 +1327,7 @@ export default function AppPage() {
           <div className="sticky top-20 space-y-4">
             <SponsorSidebar />
             <ChatPanel />
+            <TwitterFeedWidget />
             <LiveScoreWidget />
             <FixturesWidget />
             <StandingsWidget />
