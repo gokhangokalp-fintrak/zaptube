@@ -202,12 +202,12 @@ async function fetchChannelUploads(
       };
     });
 
-    // Saate göre akıllı cache — gündüz videolar sık yükleniyor
-    // 02-10: 6 saat  — kimse video yüklemez
-    // 10-17: 2 saat  — gündüz video yükleme aktif (Vole, Neo, 343 vb.)
-    // 17-02: 1 saat  — akşam da yeni videolar gelebilir
+    // Saate göre akıllı cache — canlı yayınları kaçırmamak için prime time'da kısa
+    // 02-10: 4 saat  — kimse video yüklemez, ölü saat
+    // 10-17: 1 saat  — gündüz video yükleme aktif
+    // 17-02: 15 dk   — prime time, canlı yayınları hemen yakala!
     const uploadHour = new Date().getHours();
-    const uploadCacheTTL = (uploadHour >= 2 && uploadHour < 10) ? 6 : (uploadHour >= 10 && uploadHour < 17) ? 2 : 1;
+    const uploadCacheTTL = (uploadHour >= 2 && uploadHour < 10) ? 4 : (uploadHour >= 10 && uploadHour < 17) ? 1 : 15 / 60;
     await setCache(cacheKey, videos, uploadCacheTTL);
     return videos;
   } catch (error) {
@@ -329,14 +329,15 @@ async function fetchLiveStreams(
   if (cached) return cached;
 
   try {
-    // Tek bir genel arama — "türk futbol" canlı yayınları
-    // Bu sadece 100 birim harcar (16 kanal için 1600 yerine)
+    // Geniş arama — tüm Türkçe futbol canlı yayınlarını yakala
+    // q parametresini dar tutmak yerine geniş tutuyoruz ki
+    // milli takım, Süper Lig, transfer, analiz hepsi yakalansın
     const params = new URLSearchParams({
       part: 'snippet',
-      q: 'futbol türkiye süper lig',
+      q: 'futbol',
       eventType: 'live',
       type: 'video',
-      maxResults: '10',
+      maxResults: '50',
       relevanceLanguage: 'tr',
       key: apiKey,
     });
@@ -453,10 +454,13 @@ export async function getMultiChannelVideos(
 
   // Akıllı multi-channel cache
   // Canlı varsa: live cache TTL (3dk pik, 5dk akşam vb.)
-  // Canlı yoksa: upload cache TTL (2 saat gündüz, 6 saat gece)
+  // Canlı yoksa: kısa cache — canlı başlarsa hemen yakalansın!
+  // Gece ölü saatlerde uzun, prime time'da kısa
   const hasLive = sorted.some(v => v.live);
   const multiHour = new Date().getHours();
-  const noLiveTTL = (multiHour >= 2 && multiHour < 10) ? 6 : (multiHour >= 10 && multiHour < 17) ? 2 : 1;
+  const noLiveTTL = (multiHour >= 2 && multiHour < 10) ? 2        // 2 saat — gece ölü saat
+    : (multiHour >= 10 && multiHour < 17) ? 15 / 60               // 15 dk — gündüz
+    : 5 / 60;                                                       // 5 dk — prime time (17-02)
   await setCache(cacheKey, sorted, hasLive ? getLiveCacheTTL() : noLiveTTL);
   return sorted;
 }
