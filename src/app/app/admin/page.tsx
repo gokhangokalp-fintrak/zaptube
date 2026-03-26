@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 interface DashboardStats {
   totalChannels: number;
-  activeTwitterAccounts: number;
+
   activeSponsors: number;
   totalChatMessages: number;
   totalChatRooms: number;
@@ -26,9 +26,8 @@ export default function AdminDashboard() {
     async function loadStats() {
       const supabase = createClient();
 
-      const [channels, twitter, sponsors, chatMessages, chatRooms] = await Promise.all([
+      const [channels, sponsors, chatMessages, chatRooms] = await Promise.all([
         supabase.from('channels').select('id', { count: 'exact', head: true }),
-        supabase.from('twitter_accounts').select('id', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('sponsors').select('id', { count: 'exact', head: true }).eq('is_active', true),
         supabase.from('chat_messages').select('id', { count: 'exact', head: true }),
         supabase.from('chat_rooms').select('id', { count: 'exact', head: true }),
@@ -60,7 +59,7 @@ export default function AdminDashboard() {
 
       setStats({
         totalChannels: channels.count || 0,
-        activeTwitterAccounts: twitter.count || 0,
+
         activeSponsors: sponsors.count || 0,
         totalChatMessages: chatMessages.count || 0,
         totalChatRooms: chatRooms.count || 0,
@@ -82,7 +81,7 @@ export default function AdminDashboard() {
     { label: 'Bugün Ziyaret', value: stats?.trafficToday ?? '...', icon: '📈', href: '#', color: 'yellow', subtitle: stats ? `${stats.uniqueToday} tekil` : '' },
     { label: 'Haftalık Trafik', value: stats?.trafficWeek ?? '...', icon: '📊', href: '#', color: 'pink', subtitle: stats ? `${stats.uniqueWeek} tekil` : '' },
     { label: 'YouTube Kanalları', value: stats?.totalChannels ?? '...', icon: '📺', href: '/app/admin/channels', color: 'red' },
-    { label: 'Twitter Hesapları', value: stats?.activeTwitterAccounts ?? '...', icon: '𝕏', href: '/app/admin/twitter', color: 'blue' },
+
     { label: 'Aktif Reklamlar', value: stats?.activeSponsors ?? '...', icon: '💰', href: '/app/admin/sponsors', color: 'green' },
     { label: 'Chat Mesajları', value: stats?.totalChatMessages ?? '...', icon: '💬', href: '#', color: 'purple' },
     { label: 'Chat Odaları', value: stats?.totalChatRooms ?? '...', icon: '🏠', href: '#', color: 'orange' },
@@ -145,19 +144,6 @@ export default function AdminDashboard() {
             <div>
               <p className="text-white font-medium text-sm">Yeni Kanal Ekle</p>
               <p className="text-gray-500 text-xs">YouTube kanalı ekle veya düzenle</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/app/admin/twitter"
-            className="flex items-center gap-3 p-4 rounded-xl bg-[#1e293b] border border-white/5 hover:border-blue-500/20 transition-all group"
-          >
-            <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-lg group-hover:scale-110 transition-transform">
-              🐦
-            </div>
-            <div>
-              <p className="text-white font-medium text-sm">Twitter Hesabı Ekle</p>
-              <p className="text-gray-500 text-xs">Gazeteci, medya veya kulüp hesabı ekle</p>
             </div>
           </Link>
 

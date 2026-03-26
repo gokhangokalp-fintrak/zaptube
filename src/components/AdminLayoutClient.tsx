@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 const NAV_ITEMS = [
   { href: '/app/admin', label: 'Dashboard', icon: '📊' },
   { href: '/app/admin/channels', label: 'Kanallar', icon: '📺' },
-  { href: '/app/admin/twitter', label: 'Twitter Hesapları', icon: '𝕏' },
   { href: '/app/admin/sponsors', label: 'Reklamlar', icon: '💰' },
 ];
 
