@@ -18,7 +18,7 @@ import PollWidget from '@/components/PollWidget';
 import LiveScoreWidget from '@/components/LiveScoreWidget';
 import StandingsWidget from '@/components/StandingsWidget';
 import FixturesWidget from '@/components/FixturesWidget';
-import { TwitterFeedWidget } from '@/components/TwitterTimeline';
+import TrendWidget from '@/components/TrendWidget';
 
 const data = channelData as ChannelData;
 
@@ -1237,12 +1237,20 @@ function PlayerModal({
 
             {/* Resume Toast */}
             {showResumeToast && resumeTime > 0 && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-xl bg-black/80 border border-emerald-500/30 backdrop-blur-sm animate-fade-in z-10">
+              <button
+                onClick={() => {
+                  if (playerRef.current && typeof playerRef.current.seekTo === 'function') {
+                    playerRef.current.seekTo(resumeTime, true);
+                  }
+                  setShowResumeToast(false);
+                }}
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 rounded-xl bg-black/80 border border-emerald-500/30 backdrop-blur-sm animate-fade-in z-10 cursor-pointer hover:bg-black/90 hover:border-emerald-400/50 transition-all active:scale-95"
+              >
                 <span className="text-emerald-400 text-sm">▶</span>
                 <span className="text-xs text-gray-300">
                   Kaldığın yerden devam: <span className="text-white font-bold">{Math.floor(resumeTime / 60)}:{String(resumeTime % 60).padStart(2, '0')}</span>
                 </span>
-              </div>
+              </button>
             )}
 
             {/* Autoplay Next Countdown */}
@@ -1315,14 +1323,10 @@ function PlayerModal({
             </div>
           </div>
 
-          {/* Twitter Akışı + Sponsor */}
+          {/* Trend Widget */}
           <div className="flex-1 flex flex-col gap-1 min-h-0">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Tweet Akışı Sponsoru</span>
-              <span className="text-[10px] text-yellow-500/60 font-medium">REKLAM</span>
-            </div>
             <div className="flex-1 min-h-0 overflow-hidden">
-              <TwitterFeedWidget />
+              <TrendWidget />
             </div>
           </div>
         </div>
@@ -1379,14 +1383,8 @@ function SponsorSidebar() {
         </div>
       </div>
 
-      {/* Twitter Feed with Sponsor */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Tweet Akışı Sponsoru</span>
-          <span className="text-[10px] text-yellow-500/60 font-medium">REKLAM</span>
-        </div>
-        <TwitterFeedWidget />
-      </div>
+      {/* Trend Widget */}
+      <TrendWidget />
 
       {/* Sponsor Ad Banner */}
       <AdBanner slot="sidebar" />
@@ -2045,9 +2043,6 @@ export default function AppPage() {
               <Link href="/app/channels" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 📡 Kanallar
               </Link>
-              <Link href="/app/stats" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-                📊 Reyting
-              </Link>
               <Link href="/app/admin" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-red-400 transition-colors">
                 ⚙ Admin
               </Link>
@@ -2094,9 +2089,6 @@ export default function AppPage() {
               </Link>
               <Link href="/app/channels" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
                 📡 Kanallar
-              </Link>
-              <Link href="/app/stats" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-                📊 Reyting
               </Link>
               <Link href="/app/admin" onClick={() => setMobileMenuOpen(false)} className="px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-red-400 transition-colors">
                 ⚙ Admin
@@ -2334,7 +2326,7 @@ export default function AppPage() {
           <div className="sticky top-20 space-y-4">
             <SponsorSidebar />
             <ChatPanel />
-            <TwitterFeedWidget />
+            <TrendWidget />
             <LiveScoreWidget />
             <FixturesWidget />
             <StandingsWidget />
@@ -2368,7 +2360,7 @@ export default function AppPage() {
             <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
               <SponsorSidebar />
               <ChatPanel />
-              <TwitterFeedWidget />
+              <TrendWidget />
               <LiveScoreWidget />
               <FixturesWidget />
               <StandingsWidget />
