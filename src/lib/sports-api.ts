@@ -6,7 +6,7 @@
 
 // Turkish Süper Lig: league ID 203
 const LEAGUE_ID = 203;
-const SEASON = 2025; // 2025-26 season
+const SEASON = 2024; // 2024-25 season (API-Football uses start year)
 
 const API_BASE = 'https://v3.football.api-sports.io';
 
