@@ -23,14 +23,14 @@
       "priority": 1
     },
     {
-      "id": "kale-arkasi",
-      "name": "Kale Arkası",
-      "youtubeChannelId": "UCS0Uu8WRagWU11Sjd40JIqA",
-      "description": "Futbolun perde arkası. Detaylı haberler ve analizler.",
-      "thumbnail": "/images/channels/kalearkasi.jpg",
+      "id": "socrates-dergi",
+      "name": "Socrates Dergi",
+      "youtubeChannelId": "UCvgwLFmnppZoPVBQJwPaNsA",
+      "description": "Spor kültürü ve futbol üzerine derinlemesine içerikler, belgeseller.",
+      "thumbnail": "/images/channels/socrates.jpg",
       "teams": ["genel"],
       "contentTypes": ["yorum", "analiz"],
-      "tags": ["haber", "analiz", "perde arkası"],
+      "tags": ["spor kültürü", "analiz", "belgesel"],
       "priority": 2
     },
     {
