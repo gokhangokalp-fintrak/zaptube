@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
 import { getChatRooms, getMessages, sendMessage, toggleLike, getPinnedMessages, toggleReaction, getReactionCounts } from '@/lib/chat';
 import type { ChatRoom, ChatMessage, ReactionCount } from '@/types';
-import { addXp, XP_ACTIONS, awardBadge } from '@/lib/gamification';
+import { addXp, XP_ACTIONS, awardBadge, getUserProfile, createPoll, getActivePolls, votePoll, getPollVotes, getUserVote, type Poll } from '@/lib/gamification';
 
 // Fake messages for initial activity
 const FAKE_MESSAGES = [
@@ -69,6 +69,16 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   const [messageReactions, setMessageReactions] = useState<Record<string, ReactionCount[]>>({});
   const [xpToast, setXpToast] = useState<string | null>(null);
   const [msgCount, setMsgCount] = useState(0);
+  // Poll states
+  const [userLevel, setUserLevel] = useState(1);
+  const [showPollForm, setShowPollForm] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [creatingPoll, setCreatingPoll] = useState(false);
+  const [activePolls, setActivePolls] = useState<(Poll & { votes: Record<number, number>; userVote: number | null; totalVotes: number })[]>([]);
+  const [showPolls, setShowPolls] = useState(false);
+  const [votingPollId, setVotingPollId] = useState<string | null>(null);
+  const POLL_MIN_LEVEL = 3; // Fanatik seviyesi
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const subscriptionRef = useRef<any>(null);
@@ -78,6 +88,55 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   const getSupabase = () => {
     if (!supabaseRef.current) supabaseRef.current = createClient();
     return supabaseRef.current;
+  };
+
+  // Poll helpers
+  const loadRoomPolls = useCallback(async (roomId: string, uid?: string) => {
+    try {
+      const polls = await getActivePolls(roomId);
+      const enriched = await Promise.all(polls.map(async (p) => {
+        const [votes, uv] = await Promise.all([
+          getPollVotes(p.id),
+          uid ? getUserVote(p.id, uid) : Promise.resolve(null),
+        ]);
+        const totalVotes = Object.values(votes).reduce((a, b) => a + b, 0);
+        return { ...p, votes, userVote: uv, totalVotes };
+      }));
+      setActivePolls(enriched);
+      if (enriched.length > 0) setShowPolls(true);
+    } catch {}
+  }, []);
+
+  const handleCreatePoll = async () => {
+    if (!user || !selectedRoom || !pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2) return;
+    setCreatingPoll(true);
+    try {
+      await createPoll(selectedRoom.id, user.id, pollQuestion.trim(), pollOptions.filter(o => o.trim()));
+      setPollQuestion('');
+      setPollOptions(['', '']);
+      setShowPollForm(false);
+      await loadRoomPolls(selectedRoom.id, user.id);
+      // XP ver
+      try { await addXp(user.id, XP_ACTIONS.CREATE_POLL.action, XP_ACTIONS.CREATE_POLL.amount); } catch {}
+    } catch (err) {
+      console.error('Poll create error:', err);
+    } finally {
+      setCreatingPoll(false);
+    }
+  };
+
+  const handleVotePoll = async (pollId: string, optionIndex: number) => {
+    if (!user || !selectedRoom) return;
+    setVotingPollId(pollId);
+    try {
+      await votePoll(pollId, user.id, optionIndex);
+      await loadRoomPolls(selectedRoom.id, user.id);
+      try { await addXp(user.id, XP_ACTIONS.VOTE_POLL.action, XP_ACTIONS.VOTE_POLL.amount); } catch {}
+    } catch (err: any) {
+      console.error('Vote error:', err.message);
+    } finally {
+      setVotingPollId(null);
+    }
   };
 
   const scrollToBottom = useCallback(() => {
@@ -116,6 +175,11 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         const { data: { user: authUser } } = await supabase.auth.getUser();
         if (authUser) {
           setUser(authUser);
+          // Kullanıcı seviyesini yükle
+          try {
+            const profile = await getUserProfile(authUser.id);
+            if (profile) setUserLevel(profile.level || 1);
+          } catch {}
         }
 
         // Odaları ve mesajları herkes görebilir
@@ -127,6 +191,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
           setSelectedRoom(generalRoom);
           await loadMessages(generalRoom.id);
           await loadPinnedMessages(generalRoom.id);
+          if (authUser) await loadRoomPolls(generalRoom.id, authUser.id);
         }
 
         // Auth state değişikliklerini dinle
@@ -255,6 +320,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     try {
       await loadMessages(room.id);
       await loadPinnedMessages(room.id);
+      if (user) await loadRoomPolls(room.id, user.id);
     } catch (err) {
       console.error('Room switch error:', err);
     } finally {
@@ -650,6 +716,109 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Active Polls in Chat Room */}
+      {!isGuest && activePolls.length > 0 && (
+        <div className="border-t border-white/10 shrink-0">
+          <button
+            onClick={() => setShowPolls(!showPolls)}
+            className="w-full px-3 py-1.5 flex items-center justify-between text-xs hover:bg-white/5 transition-colors"
+          >
+            <span className="text-yellow-400 font-bold">📊 Aktif Anket ({activePolls.length})</span>
+            <span className="text-gray-500">{showPolls ? '▲' : '▼'}</span>
+          </button>
+          {showPolls && (
+            <div className="px-3 pb-2 space-y-2 max-h-48 overflow-y-auto">
+              {activePolls.map(poll => {
+                const opts = Array.isArray(poll.options) ? poll.options : [];
+                const hasVoted = poll.userVote !== null;
+                return (
+                  <div key={poll.id} className="bg-white/[0.03] rounded-lg p-2 border border-white/5">
+                    <p className="text-xs text-white font-bold mb-1.5">{poll.question}</p>
+                    <div className="space-y-1">
+                      {opts.map((opt: string, idx: number) => {
+                        const voteCount = poll.votes[idx] || 0;
+                        const pct = poll.totalVotes > 0 ? (voteCount / poll.totalVotes) * 100 : 0;
+                        const isUserVote = poll.userVote === idx;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => !hasVoted && handleVotePoll(poll.id, idx)}
+                            disabled={hasVoted || votingPollId === poll.id}
+                            className={`w-full text-left rounded overflow-hidden relative transition-all ${hasVoted ? 'cursor-default' : 'hover:brightness-110 active:scale-[0.99] cursor-pointer'} ${isUserVote ? 'ring-1 ring-yellow-500/50' : ''}`}
+                          >
+                            <div className="absolute inset-0 bg-white/5">
+                              <div className={`h-full transition-all duration-500 ${hasVoted ? 'bg-yellow-500/25' : ''}`} style={{ width: hasVoted ? `${pct}%` : '0%' }} />
+                            </div>
+                            <div className="relative px-2 py-1 flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                {!hasVoted && <div className="w-2 h-2 rounded-full bg-yellow-500/60" />}
+                                {isUserVote && <span className="text-[10px] text-yellow-400">✓</span>}
+                                <span className="text-[11px] text-white">{opt}</span>
+                              </div>
+                              {hasVoted && (
+                                <span className="text-[10px] text-gray-400">{pct.toFixed(0)}% ({voteCount})</span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-1">{poll.totalVotes} oy</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Poll Creation Form */}
+      {showPollForm && (
+        <div className="px-3 py-2 border-t border-white/10 bg-[#1a1a2e] shrink-0 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-yellow-400 font-bold">📊 Yeni Anket</span>
+            <button onClick={() => setShowPollForm(false)} className="text-gray-500 hover:text-white text-xs">✕</button>
+          </div>
+          <input
+            type="text"
+            placeholder="Soru yaz... (örn: Bu maçı kim kazanır?)"
+            value={pollQuestion}
+            onChange={e => setPollQuestion(e.target.value)}
+            maxLength={200}
+            className="w-full bg-[#0f0f23] text-white text-xs rounded-lg px-2.5 py-1.5 border border-white/10 placeholder-gray-500 focus:outline-none focus:border-yellow-500/50"
+          />
+          {pollOptions.map((opt, idx) => (
+            <div key={idx} className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-yellow-500/60 shrink-0" />
+              <input
+                type="text"
+                placeholder={`Seçenek ${idx + 1}`}
+                value={opt}
+                onChange={e => { const n = [...pollOptions]; n[idx] = e.target.value; setPollOptions(n); }}
+                maxLength={50}
+                className="flex-1 bg-[#0f0f23] text-white text-[11px] rounded px-2 py-1 border border-white/10 placeholder-gray-600 focus:outline-none focus:border-yellow-500/50"
+              />
+              {pollOptions.length > 2 && (
+                <button onClick={() => setPollOptions(pollOptions.filter((_, i) => i !== idx))} className="text-gray-600 hover:text-red-400 text-[10px]">✕</button>
+              )}
+            </div>
+          ))}
+          <div className="flex items-center gap-2">
+            {pollOptions.length < 5 && (
+              <button onClick={() => setPollOptions([...pollOptions, ''])} className="text-[10px] text-gray-500 hover:text-white">+ Seçenek</button>
+            )}
+            <div className="flex-1" />
+            <button
+              onClick={handleCreatePoll}
+              disabled={creatingPoll || !pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}
+              className="px-3 py-1 rounded bg-yellow-600 text-white text-[11px] font-bold hover:bg-yellow-700 disabled:opacity-30 transition-colors"
+            >
+              {creatingPoll ? '...' : 'Yayınla'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Quick Reactions — sadece üyeler */}
       {!isGuest && (
         <div className="px-3 py-2 border-t border-white/10 flex gap-1 flex-wrap shrink-0">
@@ -703,6 +872,16 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
               maxLength={500}
               className="flex-1 bg-[#0f0f23] text-white text-sm rounded-lg px-3 py-2 border border-white/10 placeholder-gray-500 focus:outline-none focus:border-red-500/50 disabled:opacity-50"
             />
+            {/* Anket oluştur butonu — Seviye 3+ (Fanatik) */}
+            {userLevel >= POLL_MIN_LEVEL && (
+              <button
+                onClick={() => setShowPollForm(!showPollForm)}
+                title={`Anket Oluştur (Seviye ${POLL_MIN_LEVEL}+)`}
+                className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors active:scale-95 ${showPollForm ? 'bg-yellow-600 text-white' : 'bg-white/10 text-yellow-400 hover:bg-white/15'}`}
+              >
+                <span className="text-sm">📊</span>
+              </button>
+            )}
             <button
               onClick={() => handleSendMessage()}
               disabled={sending || !messageInput.trim()}

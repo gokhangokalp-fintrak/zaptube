@@ -14,7 +14,7 @@ import PrerollAd from '@/components/ads/PrerollAd';
 import ChatPanel from '@/components/ChatPanel';
 import UserProfileWidget from '@/components/UserProfileWidget';
 import { GuestReminderBanner } from '@/components/GuestPrompt';
-import PollWidget from '@/components/PollWidget';
+
 import LiveScoreWidget from '@/components/LiveScoreWidget';
 import StandingsWidget from '@/components/StandingsWidget';
 import FixturesWidget from '@/components/FixturesWidget';
@@ -2331,7 +2331,6 @@ export default function AppPage() {
             <FixturesWidget />
             <StandingsWidget />
             <UserProfileWidget />
-            <PollWidget />
           </div>
         </div>
       </div>
@@ -2365,8 +2364,7 @@ export default function AppPage() {
               <FixturesWidget />
               <StandingsWidget />
               <UserProfileWidget />
-              <PollWidget />
-            </div>
+              </div>
           </div>
         </div>
       )}
