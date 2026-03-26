@@ -1748,27 +1748,14 @@ export default function AppPage() {
     return () => clearTimeout(pollTimer);
   }, [filteredChannels]);
 
-  // TV MODE: Auto-open first live stream (or latest video) when page loads
+  // TV MODE kapatıldı — kullanıcı kendi seçsin
+  // Sayfa açılınca otomatik video açmıyoruz, anasayfa gösteriliyor
   useEffect(() => {
-    if (tvBooted || videos.length === 0 || activeVideo) return;
-
-    // Wait a tiny bit for boot animation to show
-    const timer = setTimeout(() => {
-      const live = videos.find((v) => v.live);
-      if (live) {
-        setActiveVideo(live);
-      } else {
-        // No live? Open the most recent video
-        const sorted = [...videos].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-        if (sorted[0]) setActiveVideo(sorted[0]);
-      }
+    if (!tvBooted && videos.length > 0) {
       setTvBooted(true);
-      // Hide boot animation after a short delay
-      setTimeout(() => setTvBootAnim(false), 1800);
-    }, 600);
-
-    return () => clearTimeout(timer);
-  }, [videos, tvBooted, activeVideo]);
+      setTimeout(() => setTvBootAnim(false), 300);
+    }
+  }, [videos, tvBooted]);
 
   // Separate live, regular, and shorts videos
   const SHORTS_THRESHOLD = 90; // 90 saniyeden kısa = Shorts
