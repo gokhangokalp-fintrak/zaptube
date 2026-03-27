@@ -82,6 +82,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   const subscriptionRef = useRef<any>(null);
+  const presenceChannelRef = useRef<any>(null);
   const fakeIntervalRef = useRef<any>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -157,15 +158,35 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
 
-  // Simulate online count
+  // Real online count using Supabase Presence
   useEffect(() => {
-    const base = 847 + Math.floor(Math.random() * 2000);
-    setOnlineCount(base);
-    const interval = setInterval(() => {
-      setOnlineCount(prev => prev + Math.floor(Math.random() * 21) - 10);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    const supabase = getSupabase();
+    const presenceChannel = supabase.channel('online-users', {
+      config: { presence: { key: user?.id || `guest-${Math.random().toString(36).slice(2)}` } },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const count = Object.keys(state).length;
+        setOnlineCount(count);
+      })
+      .subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            user_id: user?.id || 'guest',
+            user_name: user?.user_metadata?.full_name || 'Misafir',
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    presenceChannelRef.current = presenceChannel;
+
+    return () => {
+      presenceChannel.unsubscribe();
+    };
+  }, [user]);
 
   // Initialize — misafirler de odaları ve mesajları görebilir
   useEffect(() => {
@@ -276,34 +297,41 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     return () => { if (fakeIntervalRef.current) clearInterval(fakeIntervalRef.current); };
   }, [messages.length, selectedRoom]);
 
-  // Real-time subscription
+  // Real-time subscription — works for all logged-in users
   useEffect(() => {
-    if (!selectedRoom || !user) return;
+    if (!selectedRoom) return;
     const supabase = getSupabase();
     if (subscriptionRef.current) subscriptionRef.current.unsubscribe();
 
     subscriptionRef.current = supabase
-      .channel(`chat_v2:${selectedRoom.id}`)
+      .channel(`chat_realtime:${selectedRoom.id}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'chat_messages',
         filter: `room_id=eq.${selectedRoom.id}`,
       }, (payload: { new: ExtendedMessage }) => {
-        // Clear fake messages when real ones come in
+        const newMsg = payload.new;
+        // Clear fake messages and add new real message (deduplicate by id)
         setMessages(prev => {
           const realMessages = prev.filter(m => !m.isFake);
-          return [...realMessages, payload.new];
+          // Avoid duplicates (in case we already added locally)
+          if (realMessages.some(m => m.id === newMsg.id)) return realMessages;
+          return [...realMessages, newMsg];
         });
         if (fakeIntervalRef.current) {
           clearInterval(fakeIntervalRef.current);
           fakeIntervalRef.current = null;
         }
       })
-      .subscribe();
+      .subscribe((status: string) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime channel error for room:', selectedRoom.id);
+        }
+      });
 
     return () => { if (subscriptionRef.current) subscriptionRef.current.unsubscribe(); };
-  }, [selectedRoom, user]);
+  }, [selectedRoom]);
 
   // Handle room change
   const handleSelectRoom = async (room: ChatRoom) => {
@@ -353,7 +381,19 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Anonim';
       const avatar = userName.charAt(0).toUpperCase();
 
-      await sendMessage(selectedRoom.id, user.id, userName, avatar, text);
+      const sentMsg = await sendMessage(selectedRoom.id, user.id, userName, avatar, text);
+      // Add message locally immediately (Realtime will deduplicate)
+      if (sentMsg) {
+        setMessages(prev => {
+          const realMessages = prev.filter(m => !m.isFake);
+          if (realMessages.some(m => m.id === sentMsg.id)) return realMessages;
+          return [...realMessages, sentMsg];
+        });
+        if (fakeIntervalRef.current) {
+          clearInterval(fakeIntervalRef.current);
+          fakeIntervalRef.current = null;
+        }
+      }
       if (!content) setMessageInput('');
       setLastSendTime(now);
       setLastMessage(text);
@@ -567,7 +607,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       {/* Online count bar */}
       <div className="bg-gradient-to-r from-orange-600 to-red-600 px-3 py-1.5 text-center shrink-0">
         <span className="text-white text-xs font-bold">
-          🔴 {onlineCount.toLocaleString('tr-TR')} KİŞİ SOHBETTE 🔥
+          🔴 {onlineCount > 0 ? `${onlineCount} KİŞİ ÇEVRİMİÇİ` : 'CANLI SOHBET'} 🔥
         </span>
       </div>
 

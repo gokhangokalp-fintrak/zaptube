@@ -116,7 +116,7 @@ export default function ChatPage() {
 
     // Subscribe to new messages in selected room
     subscriptionRef.current = supabase
-      .channel(`chat_messages:${selectedRoom.id}`)
+      .channel(`chat_page_realtime:${selectedRoom.id}`)
       .on(
         'postgres_changes',
         {
@@ -127,11 +127,19 @@ export default function ChatPage() {
         },
         (payload: { new: ChatMessage }) => {
           const newMessage = payload.new;
-          setMessages((prev) => [...prev, newMessage]);
+          // Deduplicate — avoid adding if already in state
+          setMessages((prev) => {
+            if (prev.some(m => m.id === newMessage.id)) return prev;
+            return [...prev, newMessage];
+          });
           scrollToBottom();
         }
       )
-      .subscribe();
+      .subscribe((status: string) => {
+        if (status === 'CHANNEL_ERROR') {
+          console.error('Realtime channel error for room:', selectedRoom.id);
+        }
+      });
 
     return () => {
       if (subscriptionRef.current) {
@@ -352,7 +360,7 @@ export default function ChatPage() {
                         {room.emoji} {room.name}
                       </span>
                       <span className="inline-flex items-center rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">
-                        {Math.floor(Math.random() * 20) + 3}
+                        ●
                       </span>
                     </div>
                   </button>
@@ -383,7 +391,7 @@ export default function ChatPage() {
                         {room.emoji} {room.name}
                       </span>
                       <span className="inline-flex items-center rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-400">
-                        {Math.floor(Math.random() * 50) + 2}
+                        ●
                       </span>
                     </div>
                   </button>
@@ -413,7 +421,7 @@ export default function ChatPage() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="rounded-full bg-green-500/20 px-4 py-2 text-sm text-green-400">
-                  🟢 {Math.floor(Math.random() * 200) + 20} çevrimiçi
+                  🟢 çevrimiçi
                 </div>
               </div>
             </div>
