@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import channelData from '@/data/channels.json';
-import { Video, ChannelData } from '@/types';
+import { Video, ChannelData, Channel } from '@/types';
 import { formatViewCount, formatDate } from '@/lib/youtube';
 // Mock data removed — only real YouTube API data is used
 import { createClient } from '@/lib/supabase';
@@ -1239,6 +1239,197 @@ function LiveEmptyState() {
 }
 
 // =============================================
+// NEWS TV SECTION — Canlı haber kanalları TV deneyimi
+// =============================================
+function NewsTVSection({ channels, videos, loading, onStartMultiView }: {
+  channels: Channel[];
+  videos: Video[];
+  loading: boolean;
+  onStartMultiView: (videos: Video[]) => void;
+}) {
+  const [activeChannelIdx, setActiveChannelIdx] = useState(0);
+  const [autoZap, setAutoZap] = useState(false);
+  const [zapInterval, setZapInterval] = useState(30); // saniye
+  const zapTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Auto-zap timer
+  useEffect(() => {
+    if (zapTimerRef.current) clearInterval(zapTimerRef.current);
+    if (autoZap && channels.length > 1) {
+      zapTimerRef.current = setInterval(() => {
+        setActiveChannelIdx(prev => (prev + 1) % channels.length);
+      }, zapInterval * 1000);
+    }
+    return () => { if (zapTimerRef.current) clearInterval(zapTimerRef.current); };
+  }, [autoZap, zapInterval, channels.length]);
+
+  // Her kanalın canlı videosunu bul
+  const channelLiveMap = useMemo(() => {
+    const map = new Map<string, Video>();
+    // Önce canlı yayınları kontrol et
+    videos.forEach(v => {
+      if (v.live && !map.has(v.channelId)) {
+        map.set(v.channelId, v);
+      }
+    });
+    // Canlısı olmayanlar için en son videoyu kullan
+    videos.forEach(v => {
+      if (!map.has(v.channelId)) {
+        map.set(v.channelId, v);
+      }
+    });
+    return map;
+  }, [videos]);
+
+  const activeChannel = channels[activeChannelIdx];
+  const activeVideo = activeChannel ? channelLiveMap.get(activeChannel.youtubeChannelId) : null;
+
+  // Tüm kanalları multi-view'da aç
+  const handleWatchAll = () => {
+    const allLiveVideos = channels
+      .map(ch => channelLiveMap.get(ch.youtubeChannelId))
+      .filter(Boolean) as Video[];
+    if (allLiveVideos.length > 0) onStartMultiView(allLiveVideos);
+  };
+
+  if (loading) {
+    return (
+      <section className="mb-6">
+        <div className="bg-[#1e293b] rounded-2xl overflow-hidden animate-pulse">
+          <div className="aspect-video bg-gray-800" />
+          <div className="p-4 space-y-3">
+            <div className="h-5 bg-gray-800 rounded w-1/3" />
+            <div className="flex gap-2">
+              {[1,2,3,4].map(i => <div key={i} className="w-20 h-12 bg-gray-800 rounded" />)}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mb-6 animate-slide-up">
+      {/* Kontrol bar */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium text-gray-400 flex items-center gap-2">
+          <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+          Canlı Haber TV
+          <span className="text-xs text-gray-600">({channels.length} kanal)</span>
+        </h3>
+        <div className="flex items-center gap-2">
+          {/* Auto-Zap toggle */}
+          <button
+            onClick={() => setAutoZap(!autoZap)}
+            className={`text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+              autoZap
+                ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/40'
+                : 'bg-white/5 text-gray-400 hover:bg-white/10'
+            }`}
+          >
+            <span>{autoZap ? '⚡' : '🔄'}</span>
+            Auto Zap {autoZap ? `(${zapInterval}s)` : ''}
+          </button>
+          {autoZap && (
+            <select
+              value={zapInterval}
+              onChange={e => setZapInterval(Number(e.target.value))}
+              className="bg-white/5 text-gray-400 text-[11px] rounded-lg px-2 py-1.5 border-0 outline-none"
+            >
+              <option value={15}>15s</option>
+              <option value={30}>30s</option>
+              <option value={60}>1dk</option>
+              <option value={120}>2dk</option>
+            </select>
+          )}
+          {/* Hepsini İzle */}
+          <button
+            onClick={handleWatchAll}
+            className="text-[11px] px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors flex items-center gap-1.5"
+          >
+            📺 Hepsini İzle
+          </button>
+        </div>
+      </div>
+
+      {/* Ana player */}
+      <div className="bg-[#0f172a] rounded-2xl overflow-hidden ring-1 ring-white/5">
+        {/* Büyük video */}
+        <div className="relative aspect-video bg-black">
+          {activeVideo ? (
+            <iframe
+              key={activeVideo.ytVideoId}
+              src={`https://www.youtube.com/embed/${activeVideo.ytVideoId}?autoplay=1&mute=0&rel=0&modestbranding=1`}
+              className="absolute inset-0 w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-600">
+              <div className="text-center">
+                <span className="text-5xl block mb-2">📡</span>
+                <p className="text-sm">Canlı yayın aranıyor...</p>
+                <p className="text-xs text-gray-700 mt-1">Kota sıfırlandıktan sonra otomatik başlayacak</p>
+              </div>
+            </div>
+          )}
+          {/* Kanal bilgisi overlay */}
+          {activeChannel && (
+            <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-1.5">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-[10px] font-bold">
+                {activeChannel.name[0]}
+              </div>
+              <span className="text-xs font-medium">{activeChannel.name}</span>
+              {activeVideo?.live && (
+                <span className="text-[9px] px-1.5 py-0.5 bg-red-500 rounded font-bold animate-pulse">CANLI</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Kanal strip — diğer kanallar */}
+        <div className="p-3">
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollSnapType: 'x mandatory' }}>
+            {channels.map((ch, idx) => {
+              const chVideo = channelLiveMap.get(ch.youtubeChannelId);
+              const isActive = idx === activeChannelIdx;
+              return (
+                <button
+                  key={ch.id}
+                  onClick={() => { setActiveChannelIdx(idx); setAutoZap(false); }}
+                  className={`flex-shrink-0 rounded-xl overflow-hidden transition-all ${
+                    isActive
+                      ? 'ring-2 ring-blue-500 scale-[1.02]'
+                      : 'ring-1 ring-white/10 hover:ring-white/30 opacity-70 hover:opacity-100'
+                  }`}
+                  style={{ scrollSnapAlign: 'start', width: '140px' }}
+                >
+                  <div className="relative aspect-video bg-gray-800">
+                    {chVideo?.thumbnail ? (
+                      <img src={chVideo.thumbnail} alt={ch.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
+                        <span className="text-lg font-bold text-gray-600">{ch.name[0]}</span>
+                      </div>
+                    )}
+                    {chVideo?.live && (
+                      <span className="absolute top-1 right-1 text-[8px] px-1 py-0.5 bg-red-500 rounded font-bold">CANLI</span>
+                    )}
+                  </div>
+                  <div className="px-2 py-1.5 bg-[#1e293b]">
+                    <p className="text-[10px] font-medium truncate">{ch.name}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// =============================================
 // LIVE BANNER
 // =============================================
 function LiveBanner({ liveVideos, onSelect, onMultiView, multiSelectVideos, onMultiSelectToggle }: { liveVideos: Video[]; onSelect: (v: Video) => void; onMultiView: (videos: Video[]) => void; multiSelectVideos: Video[]; onMultiSelectToggle: (v: Video) => void }) {
@@ -1505,11 +1696,25 @@ export default function AppPage() {
   }, []);
 
   // Filter channels based on selections
+  // Haber ve futbol kanalları tamamen ayrı — karışmamalı!
   const filteredChannels = useMemo(() => {
     return data.channels.filter((ch) => {
-      const teamMatch = !selectedTeam || selectedTeam === 'genel' || ch.teams.includes(selectedTeam) || ch.teams.includes('genel');
+      const isNewsChannel = ch.teams.includes('haber');
+
+      // Haber sekmesi seçildiyse sadece haber kanalları
+      if (selectedTeam === 'haber') return isNewsChannel;
+
+      // Futbol sekmeleri: haber kanallarını gösterme
+      if (!selectedTeam || selectedTeam === 'genel') {
+        return !isNewsChannel;
+      }
+
+      // Takım seçildiyse: o takım + genel futbol kanalları (haber hariç)
+      const teamMatch = ch.teams.includes(selectedTeam) || ch.teams.includes('genel');
+      return teamMatch && !isNewsChannel;
+    }).filter((ch) => {
       const contentMatch = !selectedContentType || ch.contentTypes.includes(selectedContentType);
-      return teamMatch && contentMatch;
+      return contentMatch;
     });
   }, [selectedTeam, selectedContentType]);
 
@@ -1993,11 +2198,27 @@ export default function AppPage() {
             </div>
           )}
 
-          {/* LIVE SECTION */}
-          <LiveBanner liveVideos={liveVideos} onSelect={setActiveVideo} onMultiView={handleStartMultiView} multiSelectVideos={multiSelectVideos} onMultiSelectToggle={handleMultiSelectToggle} />
+          {/* LIVE SECTION — futbol için */}
+          {selectedTeam !== 'haber' && (
+            <LiveBanner liveVideos={liveVideos} onSelect={setActiveVideo} onMultiView={handleStartMultiView} multiSelectVideos={multiSelectVideos} onMultiSelectToggle={handleMultiSelectToggle} />
+          )}
 
-          {/* Matching Channels */}
-          {filteredChannels.length > 0 && (selectedTeam || selectedContentType) && (
+          {/* =============================================
+              HABER TV MODU — Canlı haber kanalları grid
+              Büyük aktif kanal + diğer kanalların önizlemeleri
+              Zap butonuyla hızlı geçiş
+              ============================================= */}
+          {selectedTeam === 'haber' && (
+            <NewsTVSection
+              channels={filteredChannels}
+              videos={videos}
+              loading={loading}
+              onStartMultiView={handleStartMultiView}
+            />
+          )}
+
+          {/* Matching Channels — futbol için */}
+          {selectedTeam !== 'haber' && filteredChannels.length > 0 && (selectedTeam || selectedContentType) && (
             <section className="mb-6 animate-slide-up">
               <h3 className="text-sm font-medium text-gray-500 mb-3">📡 Eşleşen Kanallar</h3>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollSnapType: 'x mandatory' }}>
@@ -2022,8 +2243,8 @@ export default function AppPage() {
             </section>
           )}
 
-          {/* Videos Grid */}
-          <section>
+          {/* Videos Grid — futbol için, haber modunda gizle */}
+          {selectedTeam !== 'haber' && <section>
             <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
               🎬 {selectedTeam || selectedContentType ? 'Önerilen Videolar' : 'Son Videolar'}
             </h3>
@@ -2097,10 +2318,10 @@ export default function AppPage() {
                 <p className="text-xs mt-1">YouTube API verileri çekiliyor, biraz bekle veya farklı filtre dene.</p>
               </div>
             )}
-          </section>
+          </section>}
 
-          {/* SHORTS SECTION — kısa videolar */}
-          {shortsVideos.length > 0 && (
+          {/* SHORTS SECTION — kısa videolar, haber modunda gizle */}
+          {selectedTeam !== 'haber' && shortsVideos.length > 0 && (
             <section className="mt-6 animate-slide-up">
               <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
                 <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-1.5 py-0.5 rounded">SHORTS</span>

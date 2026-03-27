@@ -164,10 +164,99 @@
       "contentTypes": ["analiz", "yorum"],
       "tags": ["dijital", "haber", "analiz"],
       "priority": 2
+    },
+    {
+      "id": "cnn-turk",
+      "name": "CNN Türk",
+      "youtubeChannelId": "UCV6zcRug6Hqp1UX_FdyUeBg",
+      "description": "CNN Türk resmi YouTube kanalı. 7/24 canlı haber yayını, son dakika haberleri ve gündem.",
+      "thumbnail": "/images/channels/cnnturk.jpg",
+      "teams": ["haber"],
+      "contentTypes": ["canli-yayin", "haber"],
+      "tags": ["haber", "canlı", "gündem", "son dakika"],
+      "priority": 1
+    },
+    {
+      "id": "haber-global",
+      "name": "Haber Global",
+      "youtubeChannelId": "UCtc-a9ZUIg0_5HpsPxEO7Qg",
+      "description": "Haber Global resmi YouTube kanalı. Güncel haberler, canlı yayın ve özel programlar.",
+      "thumbnail": "/images/channels/haberglobal.jpg",
+      "teams": ["haber"],
+      "contentTypes": ["canli-yayin", "haber"],
+      "tags": ["haber", "canlı", "gündem"],
+      "priority": 1
+    },
+    {
+      "id": "trt-haber",
+      "name": "TRT Haber",
+      "youtubeChannelId": "UCBgTP2LOFVPmq15W-RH-WXA",
+      "description": "TRT Haber resmi YouTube kanalı. Türkiye'nin kamu yayıncısı, 7/24 haber.",
+      "thumbnail": "/images/channels/trthaber.jpg",
+      "teams": ["haber"],
+      "contentTypes": ["canli-yayin", "haber"],
+      "tags": ["haber", "canlı", "kamu", "trt"],
+      "priority": 1
+    },
+    {
+      "id": "bloomberg-ht",
+      "name": "Bloomberg HT",
+      "youtubeChannelId": "UCApLxl6oYQafxvykuoC2uxQ",
+      "description": "Bloomberg HT resmi YouTube kanalı. Ekonomi, finans, piyasa haberleri ve analizler.",
+      "thumbnail": "/images/channels/bloomberght.jpg",
+      "teams": ["haber"],
+      "contentTypes": ["canli-yayin", "haber"],
+      "tags": ["ekonomi", "finans", "piyasa", "borsa"],
+      "priority": 1
+    },
+    {
+      "id": "sozcu-tv",
+      "name": "Sözcü TV",
+      "youtubeChannelId": "UCOulx_rep5O4i9y6AyDqVvw",
+      "description": "Sözcü TV resmi YouTube kanalı. Güncel haberler, tartışma programları ve canlı yayın.",
+      "thumbnail": "/images/channels/sozcutv.jpg",
+      "teams": ["haber"],
+      "contentTypes": ["canli-yayin", "haber"],
+      "tags": ["haber", "canlı", "gündem", "tartışma"],
+      "priority": 1
+    },
+    {
+      "id": "haberturk-tv",
+      "name": "Habertürk TV",
+      "youtubeChannelId": "UCn6dNfiRE_Xunu7iMyvD7AA",
+      "description": "Habertürk TV resmi YouTube kanalı. Son dakika haberleri, ekonomi ve gündem.",
+      "thumbnail": "/images/channels/haberturktv.jpg",
+      "teams": ["haber"],
+      "contentTypes": ["canli-yayin", "haber"],
+      "tags": ["haber", "canlı", "ekonomi", "gündem"],
+      "priority": 1
+    },
+    {
+      "id": "tv100",
+      "name": "TV100",
+      "youtubeChannelId": "UCndsdUW_oPLqpQJY9J8oIRg",
+      "description": "TV100 resmi YouTube kanalı. Güncel haberler, tartışma programları ve canlı yayın.",
+      "thumbnail": "/images/channels/tv100.jpg",
+      "teams": ["haber"],
+      "contentTypes": ["canli-yayin", "haber"],
+      "tags": ["haber", "canlı", "gündem"],
+      "priority": 1
+    },
+    {
+      "id": "halk-tv",
+      "name": "Halk TV",
+      "youtubeChannelId": "UCf_ResXZzE-o18zACUEmyvQ",
+      "description": "Halk TV resmi YouTube kanalı. Güncel haberler, tartışma programları ve canlı yayın.",
+      "thumbnail": "/images/channels/halktv.jpg",
+      "teams": ["haber"],
+      "contentTypes": ["canli-yayin", "haber"],
+      "tags": ["haber", "canlı", "gündem", "tartışma"],
+      "priority": 1
     }
   ],
   "teams": [
     { "id": "genel", "name": "Tüm Takımlar", "emoji": "⚽", "color": "#10B981" },
+    { "id": "haber", "name": "Haberler", "emoji": "📺", "color": "#3B82F6" },
     { "id": "gs", "name": "Galatasaray", "emoji": "🦁", "color": "#C8102E" },
     { "id": "fb", "name": "Fenerbahçe", "emoji": "🐤", "color": "#003DA5" },
     { "id": "bjk", "name": "Beşiktaş", "emoji": "🦅", "color": "#000000" },
@@ -180,6 +269,7 @@
     { "id": "sert-yorum", "name": "Sert Yorum", "emoji": "🔥", "description": "Dobra ve sert eleştiriler" },
     { "id": "eglence", "name": "Caps / Eğlence", "emoji": "😂", "description": "Eğlenceli içerikler ve capsler" },
     { "id": "canli-yayin", "name": "Canlı Yayın", "emoji": "🔴", "description": "Canlı yayınlar ve sohbetler" },
-    { "id": "taktik", "name": "Taktik Board", "emoji": "📋", "description": "Taktik tahta analizleri" }
+    { "id": "taktik", "name": "Taktik Board", "emoji": "📋", "description": "Taktik tahta analizleri" },
+    { "id": "haber", "name": "Haber", "emoji": "📰", "description": "Güncel haberler ve son dakika" }
   ]
 }
