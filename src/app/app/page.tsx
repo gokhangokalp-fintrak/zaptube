@@ -1452,7 +1452,7 @@ function LiveEmptyState() {
 // =============================================
 // LIVE BANNER
 // =============================================
-function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]; onSelect: (v: Video) => void; onMultiView: (videos: Video[]) => void }) {
+function LiveBanner({ liveVideos, onSelect, onMultiView, multiSelectVideos, onMultiSelectToggle }: { liveVideos: Video[]; onSelect: (v: Video) => void; onMultiView: (videos: Video[]) => void; multiSelectVideos: Video[]; onMultiSelectToggle: (v: Video) => void }) {
   const [selectedLive, setSelectedLive] = useState<Video[]>([]);
 
   const toggleSelect = (video: Video) => {
@@ -1564,6 +1564,22 @@ function LiveBanner({ liveVideos, onSelect, onMultiView }: { liveVideos: Video[]
                     ▶ Tek İzle
                   </button>
                 )}
+                {/* Çoklu izle butonu - ana listeye ekle */}
+                <div className="px-3 pb-2 flex justify-end">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onMultiSelectToggle(video); }}
+                    className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                      multiSelectVideos.find((v) => v.id === video.id)
+                        ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/50'
+                        : 'bg-white/5 text-gray-500 hover:bg-emerald-500/10 hover:text-emerald-400'
+                    }`}
+                    title="Çoklu izlemeye ekle/çıkar"
+                  >
+                    {multiSelectVideos.find((v) => v.id === video.id)
+                      ? `✓ Seçildi (${multiSelectVideos.findIndex((v) => v.id === video.id) + 1})`
+                      : '+ Çoklu İzle'}
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -2175,7 +2191,7 @@ export default function AppPage() {
           )}
 
           {/* LIVE SECTION */}
-          <LiveBanner liveVideos={liveVideos} onSelect={setActiveVideo} onMultiView={handleStartMultiView} />
+          <LiveBanner liveVideos={liveVideos} onSelect={setActiveVideo} onMultiView={handleStartMultiView} multiSelectVideos={multiSelectVideos} onMultiSelectToggle={handleMultiSelectToggle} />
 
           {/* Matching Channels */}
           {filteredChannels.length > 0 && (selectedTeam || selectedContentType) && (
