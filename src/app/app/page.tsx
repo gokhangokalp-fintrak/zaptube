@@ -1182,6 +1182,74 @@ function SponsorSidebar() {
 }
 
 // =============================================
+// NEWS SPONSOR SIDEBAR — Haber modu reklam alanları
+// Kurumsal: banka, finans, teknoloji, otomotiv
+// =============================================
+function NewsSponsorSidebar() {
+  return (
+    <div className="space-y-4">
+      {/* Piyasa Widget */}
+      <div className="bg-gradient-to-br from-[#0f1729] to-[#1e293b] rounded-xl border border-blue-500/20 overflow-hidden">
+        <div className="px-3 py-2 bg-blue-500/10 border-b border-blue-500/20">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-blue-400">PİYASALAR</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 live-pulse"></span>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-0.5">Sponsor alanı</p>
+        </div>
+        <div className="p-3 space-y-2">
+          {[
+            { label: 'USD/TRY', value: '—', change: '' },
+            { label: 'EUR/TRY', value: '—', change: '' },
+            { label: 'BIST 100', value: '—', change: '' },
+            { label: 'Altın/gr', value: '—', change: '' },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
+              <span className="text-[11px] text-gray-400">{item.label}</span>
+              <div className="text-right">
+                <span className="text-xs font-bold text-white">{item.value}</span>
+                <span className="text-[10px] text-gray-600 ml-1">{item.change}</span>
+              </div>
+            </div>
+          ))}
+          <p className="text-[9px] text-gray-600 text-center pt-1">Kota sıfırlanınca güncellenecek</p>
+        </div>
+      </div>
+
+      {/* Kurumsal Sponsor Alanı */}
+      <div className="bg-[#1e293b] rounded-xl border border-white/5 overflow-hidden">
+        <div className="p-4 text-center">
+          <div className="w-full h-24 rounded-lg bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/10 flex items-center justify-center mb-3">
+            <div className="text-center">
+              <span className="text-2xl block mb-1">🏦</span>
+              <p className="text-[10px] text-blue-400/60 font-medium">SPONSOR ALANI</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-600">Banka / Finans / Teknoloji</p>
+          <p className="text-[9px] text-gray-700 mt-0.5">Reklam vermek için iletişime geçin</p>
+        </div>
+      </div>
+
+      {/* İkinci Sponsor Alanı */}
+      <div className="bg-[#1e293b] rounded-xl border border-white/5 overflow-hidden">
+        <div className="p-4 text-center">
+          <div className="w-full h-20 rounded-lg bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border border-emerald-500/10 flex items-center justify-center mb-3">
+            <div className="text-center">
+              <span className="text-xl block mb-1">🚗</span>
+              <p className="text-[10px] text-emerald-400/60 font-medium">SPONSOR ALANI</p>
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-600">Otomotiv / Gayrimenkul / E-Ticaret</p>
+        </div>
+      </div>
+
+      {/* Ad Banner */}
+      <AdBanner slot="sidebar" />
+    </div>
+  );
+}
+
+// =============================================
 // LIVE EMPTY STATE — time-aware messaging
 // =============================================
 function LiveEmptyState() {
@@ -1859,7 +1927,19 @@ function extractVideoId(url: string): string {
 // MAIN APP (Protected — /app)
 // =============================================
 export default function AppPage() {
+  // URL'den mod oku (SSR-safe)
+  const [appMode, setAppMode] = useState<'spor' | 'haber'>('spor');
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+
+  // Client-side: URL parametresinden modu oku
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    if (mode === 'haber') {
+      setAppMode('haber');
+      setSelectedTeam('haber');
+    }
+  }, []);
   const [selectedContentType, setSelectedContentType] = useState<string | null>(null);
   const [activeVideo, setActiveVideo] = useState<Video | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -1901,16 +1981,16 @@ export default function AppPage() {
     });
   }, []);
 
-  // Filter channels based on selections
-  // Haber ve futbol kanalları tamamen ayrı — karışmamalı!
+  // Filter channels based on app mode
+  // Haber ve futbol kanalları tamamen ayrı dünyalar
   const filteredChannels = useMemo(() => {
     return data.channels.filter((ch) => {
       const isNewsChannel = ch.teams.includes('haber');
 
-      // Haber sekmesi seçildiyse sadece haber kanalları
-      if (selectedTeam === 'haber') return isNewsChannel;
+      // Haber modunda sadece haber kanalları
+      if (appMode === 'haber') return isNewsChannel;
 
-      // Futbol sekmeleri: haber kanallarını gösterme
+      // Spor modunda haber kanallarını gösterme
       if (!selectedTeam || selectedTeam === 'genel') {
         return !isNewsChannel;
       }
@@ -2149,6 +2229,17 @@ export default function AppPage() {
     setSelectedContentType(null);
   }, []);
 
+  // Mod değiştirme — Spor ↔ Haber
+  const handleModeSwitch = useCallback(() => {
+    const newMode = appMode === 'spor' ? 'haber' : 'spor';
+    setAppMode(newMode);
+    setSelectedTeam(newMode === 'haber' ? 'haber' : null);
+    setSelectedContentType(null);
+    setActiveVideo(null);
+    // URL'yi güncelle (sayfa yenilemeden)
+    window.history.replaceState(null, '', `/app?mode=${newMode}`);
+  }, [appMode]);
+
   const currentZapIndex = activeVideo ? allVideos.findIndex((v) => v.id === activeVideo.id) : 0;
 
   return (
@@ -2257,25 +2348,50 @@ export default function AppPage() {
                 </h1>
               </div>
             </div>
+            {/* Mod geçiş butonu */}
+            <button
+              onClick={handleModeSwitch}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all border ${
+                appMode === 'spor'
+                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20'
+                  : 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
+              }`}
+            >
+              <span>{appMode === 'spor' ? '📰' : '⚽'}</span>
+              {appMode === 'spor' ? 'Habere Geç' : 'Spora Geç'}
+            </button>
             <nav className="hidden md:flex items-center gap-1 ml-2">
-              <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400">
-                📺 Ana Sayfa
-              </span>
-              <Link href="/app/matches" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-                ⚽ Maçlar
-              </Link>
-              <Link href="/app/chat" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-                💬 Sohbet
-              </Link>
-              <Link href="/app/trend" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-                📊 Trend
-              </Link>
-              <Link href="/app/channels" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
-                📡 Kanallar
-              </Link>
-              <Link href="/app/admin" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-red-400 transition-colors">
-                ⚙ Admin
-              </Link>
+              {appMode === 'spor' ? (
+                <>
+                  <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/15 text-emerald-400">
+                    📺 Ana Sayfa
+                  </span>
+                  <Link href="/app/matches" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                    ⚽ Maçlar
+                  </Link>
+                  <Link href="/app/chat" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                    💬 Sohbet
+                  </Link>
+                  <Link href="/app/trend" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                    📊 Trend
+                  </Link>
+                  <Link href="/app/channels" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+                    📡 Kanallar
+                  </Link>
+                  <Link href="/app/admin" className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-red-400 transition-colors">
+                    ⚙ Admin
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/15 text-blue-400">
+                    📺 Canlı TV
+                  </span>
+                  <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-300">
+                    📰 Haber Akışı
+                  </span>
+                </>
+              )}
             </nav>
             {/* Mobile hamburger button */}
             <button
@@ -2345,49 +2461,53 @@ export default function AppPage() {
             </div>
           )}
 
-          {/* Step 1: Team Selection */}
-          <section className="mb-6">
-            <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold">1</span>
-              Takımını Seç
-            </h3>
-            <div className="flex flex-wrap gap-2 stagger">
-              {data.teams.map((team) => {
-                const active = selectedTeam === team.id;
-                return (
-                  <button key={team.id} onClick={() => setSelectedTeam(active ? null : team.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active ? 'scale-105 shadow-lg' : 'bg-[#1e293b] hover:bg-[#334155] text-gray-300 hover:text-white'}`}
-                    style={active ? { backgroundColor: team.color + '22', color: team.color === '#000000' ? '#fff' : team.color, boxShadow: `0 0 20px ${team.color}33, inset 0 0 0 1px ${team.color}55` } : undefined}>
-                    <span className="text-lg">{team.emoji}</span>
-                    <span>{team.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+          {/* Step 1: Team Selection — sadece SPOR modunda */}
+          {appMode === 'spor' && (
+            <section className="mb-6">
+              <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold">1</span>
+                Takımını Seç
+              </h3>
+              <div className="flex flex-wrap gap-2 stagger">
+                {data.teams.filter(t => t.id !== 'haber').map((team) => {
+                  const active = selectedTeam === team.id;
+                  return (
+                    <button key={team.id} onClick={() => setSelectedTeam(active ? null : team.id)}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${active ? 'scale-105 shadow-lg' : 'bg-[#1e293b] hover:bg-[#334155] text-gray-300 hover:text-white'}`}
+                      style={active ? { backgroundColor: team.color + '22', color: team.color === '#000000' ? '#fff' : team.color, boxShadow: `0 0 20px ${team.color}33, inset 0 0 0 1px ${team.color}55` } : undefined}>
+                      <span className="text-lg">{team.emoji}</span>
+                      <span>{team.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
-          {/* Step 2: Content Type */}
-          <section className="mb-8">
-            <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold">2</span>
-              Ne İzlemek İstiyorsun?
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 stagger">
-              {data.contentTypes.map((ct) => {
-                const active = selectedContentType === ct.id;
-                return (
-                  <button key={ct.id} onClick={() => setSelectedContentType(active ? null : ct.id)}
-                    className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-sm transition-all duration-200 ${active ? 'bg-emerald-500/15 ring-1 ring-emerald-500/50 text-emerald-300 scale-105' : 'bg-[#1e293b] hover:bg-[#334155] text-gray-400 hover:text-white'}`}>
-                    <span className="text-xl">{ct.emoji}</span>
-                    <span className="font-medium text-xs">{ct.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+          {/* Step 2: Content Type — sadece SPOR modunda */}
+          {appMode === 'spor' && (
+            <section className="mb-8">
+              <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold">2</span>
+                Ne İzlemek İstiyorsun?
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 stagger">
+                {data.contentTypes.filter(ct => ct.id !== 'haber').map((ct) => {
+                  const active = selectedContentType === ct.id;
+                  return (
+                    <button key={ct.id} onClick={() => setSelectedContentType(active ? null : ct.id)}
+                      className={`flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-sm transition-all duration-200 ${active ? 'bg-emerald-500/15 ring-1 ring-emerald-500/50 text-emerald-300 scale-105' : 'bg-[#1e293b] hover:bg-[#334155] text-gray-400 hover:text-white'}`}>
+                      <span className="text-xl">{ct.emoji}</span>
+                      <span className="font-medium text-xs">{ct.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
-          {/* Active Filters */}
-          {(selectedTeam || selectedContentType) && (
+          {/* Active Filters — sadece SPOR modunda */}
+          {appMode === 'spor' && (selectedTeam || selectedContentType) && (
             <div className="flex flex-wrap items-center gap-2 mb-4 text-sm text-gray-400 animate-slide-up">
               <span>🔍</span>
               {selectedTeam && (
@@ -2405,7 +2525,7 @@ export default function AppPage() {
           )}
 
           {/* LIVE SECTION — futbol için */}
-          {selectedTeam !== 'haber' && (
+          {appMode === 'spor' && (
             <LiveBanner liveVideos={liveVideos} onSelect={setActiveVideo} onMultiView={handleStartMultiView} multiSelectVideos={multiSelectVideos} onMultiSelectToggle={handleMultiSelectToggle} />
           )}
 
@@ -2414,7 +2534,7 @@ export default function AppPage() {
               Büyük aktif kanal + diğer kanalların önizlemeleri
               Zap butonuyla hızlı geçiş
               ============================================= */}
-          {selectedTeam === 'haber' && (
+          {appMode === 'haber' && (
             <>
               <NewsTVSection
                 channels={filteredChannels}
@@ -2427,7 +2547,7 @@ export default function AppPage() {
           )}
 
           {/* Matching Channels — futbol için */}
-          {selectedTeam !== 'haber' && filteredChannels.length > 0 && (selectedTeam || selectedContentType) && (
+          {appMode === 'spor' && filteredChannels.length > 0 && (selectedTeam || selectedContentType) && (
             <section className="mb-6 animate-slide-up">
               <h3 className="text-sm font-medium text-gray-500 mb-3">📡 Eşleşen Kanallar</h3>
               <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollSnapType: 'x mandatory' }}>
@@ -2453,7 +2573,7 @@ export default function AppPage() {
           )}
 
           {/* Videos Grid — futbol için, haber modunda gizle */}
-          {selectedTeam !== 'haber' && <section>
+          {appMode === 'spor' && <section>
             <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
               🎬 {selectedTeam || selectedContentType ? 'Önerilen Videolar' : 'Son Videolar'}
             </h3>
@@ -2530,7 +2650,7 @@ export default function AppPage() {
           </section>}
 
           {/* SHORTS SECTION — kısa videolar, haber modunda gizle */}
-          {selectedTeam !== 'haber' && shortsVideos.length > 0 && (
+          {appMode === 'spor' && shortsVideos.length > 0 && (
             <section className="mt-6 animate-slide-up">
               <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
                 <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-1.5 py-0.5 rounded">SHORTS</span>
@@ -2573,13 +2693,23 @@ export default function AppPage() {
         {/* Right: Sidebar (hidden on mobile) */}
         <div className="hidden lg:block w-96 shrink-0">
           <div className="sticky top-20 space-y-4">
-            <SponsorSidebar />
-            <ChatPanel />
-            <TrendWidget />
-            <LiveScoreWidget />
-            <FixturesWidget />
-            <StandingsWidget />
-            <UserProfileWidget />
+            {appMode === 'spor' ? (
+              <>
+                <SponsorSidebar />
+                <ChatPanel />
+                <TrendWidget />
+                <LiveScoreWidget />
+                <FixturesWidget />
+                <StandingsWidget />
+                <UserProfileWidget />
+              </>
+            ) : (
+              <>
+                <NewsSponsorSidebar />
+                <ChatPanel />
+                <UserProfileWidget />
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -2595,7 +2725,7 @@ export default function AppPage() {
 
             {/* Drawer Header */}
             <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between shrink-0">
-              <h3 className="text-sm font-bold text-white">⚽ Bilgiler & Sohbet</h3>
+              <h3 className="text-sm font-bold text-white">{appMode === 'spor' ? '⚽ Bilgiler & Sohbet' : '📰 Haber & Sohbet'}</h3>
               <button
                 onClick={() => setMobileSidebarOpen(false)}
                 className="w-6 h-6 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white text-sm"
@@ -2606,13 +2736,23 @@ export default function AppPage() {
 
             {/* Drawer Content - Scrollable */}
             <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4">
-              <SponsorSidebar />
-              <ChatPanel />
-              <TrendWidget />
-              <LiveScoreWidget />
-              <FixturesWidget />
-              <StandingsWidget />
-              <UserProfileWidget />
+              {appMode === 'spor' ? (
+                <>
+                  <SponsorSidebar />
+                  <ChatPanel />
+                  <TrendWidget />
+                  <LiveScoreWidget />
+                  <FixturesWidget />
+                  <StandingsWidget />
+                  <UserProfileWidget />
+                </>
+              ) : (
+                <>
+                  <NewsSponsorSidebar />
+                  <ChatPanel />
+                  <UserProfileWidget />
+                </>
+              )}
               </div>
           </div>
         </div>

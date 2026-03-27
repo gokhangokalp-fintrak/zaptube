@@ -10,10 +10,10 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'ZapTube | Türk Futbol YouTube Kumandası',
+  title: 'ZapTube | Spor & Haber TV Platformu',
   description:
-    'Türkiye\'deki futbol yorum YouTube kanallarını tek bir arayüzde keşfet. Takımını seç, içerik tipini belirle, doğru kanala ulaş. Zap yap, izle!',
-  keywords: ['türk futbol', 'youtube', 'galatasaray', 'fenerbahçe', 'beşiktaş', 'trabzonspor', 'süper lig'],
+    'Türk futbol YouTube kanalları ve canlı haber TV\'leri tek bir platformda. Spor, haber, ekonomi — zap yap, doğru kanala ulaş!',
+  keywords: ['türk futbol', 'youtube', 'haber', 'ekonomi', 'canlı tv', 'galatasaray', 'fenerbahçe', 'beşiktaş', 'trabzonspor', 'süper lig', 'cnn türk', 'bloomberg ht'],
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
