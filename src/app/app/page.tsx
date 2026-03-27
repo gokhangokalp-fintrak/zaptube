@@ -219,26 +219,36 @@ function MultiViewPlayer({
   const iframeRefs = useRef<(HTMLIFrameElement | null)[]>([]);
 
   // iOS-safe: tüm iframe'ler muted başlar, aktif olan postMessage ile unmute edilir
-  // Double-tap mute/unmute to ensure it sticks (some browsers ignore first postMessage)
+  // Ayrıca canlı olmayan videolar geçiş yapıldığında duraklatılır,
+  // geri dönüldüğünde kaldığı yerden devam eder.
   useEffect(() => {
-    const sendMuteCommands = () => {
+    const sendCommands = () => {
       iframeRefs.current.forEach((iframe, idx) => {
         if (!iframe?.contentWindow) return;
+        const video = videos[idx];
+        const isActive = idx === activeAudioIndex;
         try {
-          if (idx === activeAudioIndex) {
+          if (isActive) {
+            // Aktif video: ses aç + oynat
             iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"setVolume","args":[100]}', '*');
+            iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
           } else {
+            // İnaktif video: sesi kapat
             iframe.contentWindow.postMessage('{"event":"command","func":"mute","args":""}', '*');
             iframe.contentWindow.postMessage('{"event":"command","func":"setVolume","args":[0]}', '*');
+            // Canlı olmayan videoları duraklat — kaldığı yerden devam edecek
+            if (!video?.live) {
+              iframe.contentWindow.postMessage('{"event":"command","func":"pauseVideo","args":""}', '*');
+            }
           }
         } catch {}
       });
     };
     // Send immediately + retry after delays to ensure it takes effect
-    const t1 = setTimeout(sendMuteCommands, 300);
-    const t2 = setTimeout(sendMuteCommands, 800);
-    const t3 = setTimeout(sendMuteCommands, 1500);
+    const t1 = setTimeout(sendCommands, 300);
+    const t2 = setTimeout(sendCommands, 800);
+    const t3 = setTimeout(sendCommands, 1500);
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [activeAudioIndex, videos.length]);
 
@@ -454,7 +464,7 @@ function MultiViewPlayer({
                     <div key={video.id} className={`absolute inset-0 transition-opacity duration-200 ${isVisible ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                       <iframe
                         ref={(el) => { iframeRefs.current[idx] = el; }}
-                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1`}
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1`}
                         title={video.title}
                         className="w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -493,7 +503,7 @@ function MultiViewPlayer({
                         )}
                       </div>
                     </div>
-                    <div className="absolute bottom-3 right-3 z-20 pointer-events-none">
+                    <div className="absolute bottom-14 right-3 z-20 pointer-events-none">
                       <span className="px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-blue-400/80 font-medium backdrop-blur-sm">
                         📊 İş Yatırım sponsorluğunda
                       </span>
@@ -568,7 +578,7 @@ function MultiViewPlayer({
                   >
                     <iframe
                       ref={(el) => { iframeRefs.current[idx] = el; }}
-                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1`}
+                      src={`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1`}
                       title={video.title}
                       className="w-full h-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
