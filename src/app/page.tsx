@@ -2,9 +2,24 @@
 
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function LandingPage() {
   const router = useRouter();
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function fetchCount() {
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.rpc('get_registered_user_count');
+        setMemberCount(Number(data) || 0);
+      } catch {
+        // silently fail
+      }
+    }
+    fetchCount();
+  }, []);
 
   const handleGoogleLogin = async () => {
     const supabase = createClient();
@@ -103,6 +118,18 @@ export default function LandingPage() {
               <h3 className="font-semibold text-sm mb-1">Sayfadan Ayrılma</h3>
               <p className="text-xs text-gray-500">Videoları ZapTube içinde izle, YouTube&apos;a gitmene gerek yok.</p>
             </div>
+          {/* Community Counter */}
+          {memberCount !== null && memberCount > 0 && (
+            <div className="mt-10 flex justify-center">
+              <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-red-500/10 to-emerald-500/10 border border-white/10">
+                <span className="text-lg">👥</span>
+                <span className="text-sm text-gray-300">
+                  ZapTube ailesinde <span className="font-bold text-white">{memberCount.toLocaleString('tr-TR')}</span> kişiyiz!
+                </span>
+                <span className="text-lg">⚡</span>
+              </div>
+            </div>
+          )}
           </div>
         </div>
       </div>
