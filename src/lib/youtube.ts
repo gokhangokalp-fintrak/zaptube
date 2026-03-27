@@ -344,13 +344,28 @@ export async function searchChannelVideos(
 // 17-20: 0.08 saat (~5dk) — maç öncesi yoğunluk
 // 20-02: 0.05 saat (~3dk) — pik saat
 // =============================================
+// KOTA HESABI (server-side, tüm kullanıcılar ortak):
+// Live search = 100 birim. En pahalı çağrı!
+// Uploads zaten canlı yayınları yakalıyor (liveBroadcastContent === 'live')
+// Bu yüzden live search sadece ek güvenlik — çok sık olmasına gerek yok.
+//
+// 02-10: 2 saat     →  4 çağrı × 100 =    400 birim
+// 10-17: 30 dk      → 14 çağrı × 100 =  1.400 birim
+// 17-20: 15 dk      → 12 çağrı × 100 =  1.200 birim
+// 20-02: 10 dk      → 36 çağrı × 100 =  3.600 birim
+// TOPLAM live search:                    ~6.600 birim/gün
+//
+// Uploads (15 kanal × 2 birim = 30 birim per yenileme):
+// Gece 4 saat cache, gündüz 1 saat, prime 15 dk
+// ~60 yenileme × 30 =                   ~1.800 birim/gün
+//
+// GÜNLÜK TOPLAM:                         ~8.400 birim/gün ✅ (10K kotanın altında)
 function getLiveCacheTTL(): number {
   const hour = new Date().getHours();
-  if (hour >= 2 && hour < 10) return 2;       // 2 saat — ölü saat
-  if (hour >= 10 && hour < 12) return 0.5;     // 30 dk — nadir
-  if (hour >= 12 && hour < 17) return 0.25;    // 15 dk — öğlen
-  if (hour >= 17 && hour < 20) return 5 / 60;  // 5 dk — maç öncesi
-  return 3 / 60;                                // 3 dk — pik saat (20-02)
+  if (hour >= 2 && hour < 10) return 2;        // 2 saat — ölü saat
+  if (hour >= 10 && hour < 17) return 0.5;      // 30 dk — gündüz
+  if (hour >= 17 && hour < 20) return 0.25;     // 15 dk — maç öncesi
+  return 10 / 60;                                // 10 dk — pik saat (20-02)
 }
 
 async function fetchLiveStreams(

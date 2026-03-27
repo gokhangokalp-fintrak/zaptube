@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import channelData from '@/data/channels.json';
 import { Video, ChannelData } from '@/types';
-import { getMultiChannelVideos, formatViewCount, formatDate } from '@/lib/youtube';
+import { formatViewCount, formatDate } from '@/lib/youtube';
 // Mock data removed — only real YouTube API data is used
 import { createClient } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -1513,37 +1513,39 @@ export default function AppPage() {
     });
   }, [selectedTeam, selectedContentType]);
 
-  // Fetch real videos from YouTube API + poll every 3 minutes for live streams
+  // Fetch videos via SERVER-SIDE API route — kota koruması!
+  // Tüm YouTube API çağrıları sunucuda yapılır, L1 cache tüm kullanıcılar için ortak.
+  // 100 kişi açsa bile sunucu sadece 1 kez YouTube API'ye gider.
   useEffect(() => {
     if (filteredChannels.length === 0) {
       setVideos([]);
       return;
     }
 
-    const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
     const realChannels = filteredChannels.filter((ch) => ch.youtubeChannelId.startsWith('UC'));
     const channelYtIds = realChannels.map((ch) => ch.youtubeChannelId);
 
-    if (!apiKey || channelYtIds.length === 0) {
+    if (channelYtIds.length === 0) {
       setVideos([]);
       return;
     }
 
     const fetchVideos = (showLoading = true) => {
       if (showLoading) setLoading(true);
-      getMultiChannelVideos(channelYtIds, apiKey, 4)
-        .then((result) => {
-          const arr = Array.isArray(result) ? result : [];
+      const params = new URLSearchParams({
+        channelIds: channelYtIds.join(','),
+        max: '4',
+      });
+      fetch(`/api/videos?${params}`)
+        .then((res) => res.json())
+        .then((data) => {
+          const arr = Array.isArray(data?.videos) ? data.videos : [];
           // KRİTİK: API boş dönerse mevcut videoları KORU — silme!
-          // YouTube kotası aşıldığında veya hata olduğunda
-          // kullanıcı boş sayfa görmemeli, eski veriler dursun
           if (arr.length > 0 || showLoading) {
             setVideos(arr);
           }
-          // else: polling empty result → mevcut videoları koru
         })
         .catch(() => {
-          // Hata durumunda mevcut videoları koru, sadece ilk yüklemede boş göster
           if (showLoading) setVideos([]);
         })
         .finally(() => { if (showLoading) setLoading(false); });
