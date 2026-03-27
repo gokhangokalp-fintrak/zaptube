@@ -1227,6 +1227,8 @@ function PlayerModal({
   useEffect(() => {
     if (!video) return;
     const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.key === 'Escape') onClose();
       if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') onZap('prev');
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') onZap('next');
@@ -1910,6 +1912,10 @@ export default function AppPage() {
   // Keyboard ZAP (global — when not in modal)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Don't capture keystrokes when user is typing in chat or other inputs
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
       if (activeVideo || multiViewVideos.length > 0) return; // Modal handles its own keys
 
       // Enter: start multi-view with selected videos

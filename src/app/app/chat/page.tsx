@@ -109,42 +109,46 @@ export default function ChatPage() {
 
     const supabase = getSupabase();
 
-    // Unsubscribe from previous room
+    // Cleanup previous channel
     if (subscriptionRef.current) {
-      subscriptionRef.current.unsubscribe();
+      try { supabase.removeChannel(subscriptionRef.current); } catch {}
     }
 
-    // Subscribe to new messages in selected room
-    subscriptionRef.current = supabase
-      .channel(`chat_page_realtime:${selectedRoom.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `room_id=eq.${selectedRoom.id}`,
-        },
-        (payload: { new: ChatMessage }) => {
-          const newMessage = payload.new;
-          // Deduplicate — avoid adding if already in state
-          setMessages((prev) => {
-            if (prev.some(m => m.id === newMessage.id)) return prev;
-            return [...prev, newMessage];
-          });
-          scrollToBottom();
-        }
-      )
-      .subscribe((status: string) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime channel error for room:', selectedRoom.id);
-        }
+    // Combined channel: Broadcast + postgres_changes for this room
+    const channel = supabase.channel(`chat-room:${selectedRoom.id}`);
+
+    // Broadcast — instant message delivery from other users
+    channel.on('broadcast', { event: 'new_message' }, (payload: any) => {
+      const newMessage: ChatMessage = payload.payload;
+      if (!newMessage || !newMessage.id) return;
+      if (newMessage.user_id === user?.id) return; // Skip own
+      setMessages((prev) => {
+        if (prev.some(m => m.id === newMessage.id)) return prev;
+        return [...prev, newMessage];
       });
+      scrollToBottom();
+    });
+
+    // postgres_changes as backup
+    channel.on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'chat_messages',
+      filter: `room_id=eq.${selectedRoom.id}`,
+    }, (payload: { new: ChatMessage }) => {
+      const newMessage = payload.new;
+      setMessages((prev) => {
+        if (prev.some(m => m.id === newMessage.id)) return prev;
+        return [...prev, newMessage];
+      });
+      scrollToBottom();
+    });
+
+    channel.subscribe();
+    subscriptionRef.current = channel;
 
     return () => {
-      if (subscriptionRef.current) {
-        subscriptionRef.current.unsubscribe();
-      }
+      try { supabase.removeChannel(channel); } catch {}
     };
   }, [selectedRoom, user]);
 
@@ -173,9 +177,20 @@ export default function ChatPage() {
       );
 
       if (newMessage) {
-        setMessages((prev) => [...prev, newMessage]);
+        setMessages((prev) => {
+          if (prev.some(m => m.id === newMessage.id)) return prev;
+          return [...prev, newMessage];
+        });
         setMessageInput('');
         scrollToBottom();
+        // Broadcast to other users
+        if (subscriptionRef.current) {
+          subscriptionRef.current.send({
+            type: 'broadcast',
+            event: 'new_message',
+            payload: newMessage,
+          });
+        }
       }
     } catch (err) {
       console.error('Send message error:', err);

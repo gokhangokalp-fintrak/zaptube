@@ -158,28 +158,71 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenu]);
 
-  // Real online count using Supabase Presence
-  const presenceIdRef = useRef(`chat-${Math.random().toString(36).slice(2)}`);
+  // Combined Realtime channel: Presence (online count) + Broadcast (instant messages)
+  // Uses a SHARED channel name so all instances for the same room can see each other
+  const instanceIdRef = useRef(Math.random().toString(36).slice(2, 8));
   useEffect(() => {
+    if (!selectedRoom) return;
     const supabase = getSupabase();
-    // Unique channel name per component instance to avoid conflicts
-    const channelName = `online-presence:${presenceIdRef.current}`;
+    const presenceKey = user?.id || `guest-${instanceIdRef.current}`;
+    // Shared channel per room — all users on same room share this channel
+    const channelName = `chat-room:${selectedRoom.id}`;
 
-    // First cleanup any existing channel
+    // Cleanup previous
     if (presenceChannelRef.current) {
-      try { presenceChannelRef.current.unsubscribe(); } catch {}
+      try { supabase.removeChannel(presenceChannelRef.current); } catch {}
       presenceChannelRef.current = null;
+    }
+    if (subscriptionRef.current) {
+      try { supabase.removeChannel(subscriptionRef.current); } catch {}
+      subscriptionRef.current = null;
     }
 
     const channel = supabase.channel(channelName, {
-      config: { presence: { key: user?.id || presenceIdRef.current } },
+      config: { presence: { key: presenceKey } },
     });
 
-    // Add callbacks BEFORE subscribing
+    // 1) Presence — online count
     channel.on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState();
       const count = Object.keys(state).length;
       setOnlineCount(count);
+    });
+
+    // 2) Broadcast — instant message delivery (no RLS dependency)
+    channel.on('broadcast', { event: 'new_message' }, (payload: any) => {
+      const newMsg: ExtendedMessage = payload.payload;
+      if (!newMsg || !newMsg.id) return;
+      // Skip own messages (already added locally on send)
+      if (newMsg.user_id === user?.id) return;
+      setMessages(prev => {
+        const realMessages = prev.filter(m => !m.isFake);
+        if (realMessages.some(m => m.id === newMsg.id)) return realMessages;
+        return [...realMessages, newMsg];
+      });
+      if (fakeIntervalRef.current) {
+        clearInterval(fakeIntervalRef.current);
+        fakeIntervalRef.current = null;
+      }
+    });
+
+    // 3) postgres_changes as backup (for messages from other sources)
+    channel.on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'chat_messages',
+      filter: `room_id=eq.${selectedRoom.id}`,
+    }, (payload: { new: ExtendedMessage }) => {
+      const newMsg = payload.new;
+      setMessages(prev => {
+        const realMessages = prev.filter(m => !m.isFake);
+        if (realMessages.some(m => m.id === newMsg.id)) return realMessages;
+        return [...realMessages, newMsg];
+      });
+      if (fakeIntervalRef.current) {
+        clearInterval(fakeIntervalRef.current);
+        fakeIntervalRef.current = null;
+      }
     });
 
     channel.subscribe(async (status: string) => {
@@ -195,9 +238,9 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     presenceChannelRef.current = channel;
 
     return () => {
-      try { channel.unsubscribe(); } catch {}
+      try { supabase.removeChannel(channel); } catch {}
     };
-  }, [user]);
+  }, [selectedRoom, user]);
 
   // Initialize — misafirler de odaları ve mesajları görebilir
   useEffect(() => {
@@ -308,41 +351,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     return () => { if (fakeIntervalRef.current) clearInterval(fakeIntervalRef.current); };
   }, [messages.length, selectedRoom]);
 
-  // Real-time subscription — works for all logged-in users
-  useEffect(() => {
-    if (!selectedRoom) return;
-    const supabase = getSupabase();
-    if (subscriptionRef.current) subscriptionRef.current.unsubscribe();
-
-    subscriptionRef.current = supabase
-      .channel(`chat_realtime:${selectedRoom.id}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages',
-        filter: `room_id=eq.${selectedRoom.id}`,
-      }, (payload: { new: ExtendedMessage }) => {
-        const newMsg = payload.new;
-        // Clear fake messages and add new real message (deduplicate by id)
-        setMessages(prev => {
-          const realMessages = prev.filter(m => !m.isFake);
-          // Avoid duplicates (in case we already added locally)
-          if (realMessages.some(m => m.id === newMsg.id)) return realMessages;
-          return [...realMessages, newMsg];
-        });
-        if (fakeIntervalRef.current) {
-          clearInterval(fakeIntervalRef.current);
-          fakeIntervalRef.current = null;
-        }
-      })
-      .subscribe((status: string) => {
-        if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime channel error for room:', selectedRoom.id);
-        }
-      });
-
-    return () => { if (subscriptionRef.current) subscriptionRef.current.unsubscribe(); };
-  }, [selectedRoom]);
+  // Note: Realtime subscription is now combined with Presence above in a single channel
 
   // Handle room change
   const handleSelectRoom = async (room: ChatRoom) => {
@@ -393,7 +402,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       const avatar = userName.charAt(0).toUpperCase();
 
       const sentMsg = await sendMessage(selectedRoom.id, user.id, userName, avatar, text);
-      // Add message locally immediately (Realtime will deduplicate)
+      // Add message locally immediately
       if (sentMsg) {
         setMessages(prev => {
           const realMessages = prev.filter(m => !m.isFake);
@@ -403,6 +412,14 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
         if (fakeIntervalRef.current) {
           clearInterval(fakeIntervalRef.current);
           fakeIntervalRef.current = null;
+        }
+        // Broadcast to other users via Realtime channel
+        if (presenceChannelRef.current) {
+          presenceChannelRef.current.send({
+            type: 'broadcast',
+            event: 'new_message',
+            payload: sentMsg,
+          });
         }
       }
       if (!content) setMessageInput('');
