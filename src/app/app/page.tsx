@@ -1430,6 +1430,212 @@ function NewsTVSection({ channels, videos, loading, onStartMultiView }: {
 }
 
 // =============================================
+// NEWS FEED SECTION — RSS haber akışı
+// Kategoriler: Gündem, Ekonomi, Dünya, Spor, Teknoloji
+// =============================================
+interface NewsItem {
+  id: string;
+  title: string;
+  link: string;
+  source: string;
+  category: string;
+  categoryName: string;
+  pubDate: string;
+  description: string;
+  image?: string;
+}
+
+interface NewsCategory {
+  id: string;
+  name: string;
+}
+
+function NewsFeedSection() {
+  const [activeCategory, setActiveCategory] = useState('gundem');
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [categories, setCategories] = useState<NewsCategory[]>([
+    { id: 'gundem', name: 'Gündem' },
+    { id: 'ekonomi', name: 'Ekonomi' },
+    { id: 'dunya', name: 'Dünya' },
+    { id: 'spor', name: 'Spor' },
+    { id: 'teknoloji', name: 'Teknoloji' },
+  ]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchNews = useCallback(async (cat: string) => {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await fetch(`/api/news?category=${cat}&limit=20`);
+      if (!res.ok) throw new Error('fetch failed');
+      const data = await res.json();
+      setNews(data.items || []);
+      if (data.categories) setCategories(data.categories);
+    } catch {
+      setError(true);
+      setNews([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchNews(activeCategory);
+  }, [activeCategory, fetchNews]);
+
+  // Zaman formatla
+  const timeAgo = (dateStr: string) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Az önce';
+    if (mins < 60) return `${mins}dk`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}sa`;
+    const days = Math.floor(hours / 24);
+    return `${days}g`;
+  };
+
+  return (
+    <section className="mb-6 animate-slide-up">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-medium text-gray-400 flex items-center gap-2">
+          📰 Haber Akışı
+        </h3>
+        <button
+          onClick={() => fetchNews(activeCategory)}
+          className="text-[11px] px-2 py-1 rounded-lg bg-white/5 text-gray-500 hover:text-gray-300 hover:bg-white/10 transition-colors"
+        >
+          ↻ Yenile
+        </button>
+      </div>
+
+      {/* Kategori tabları */}
+      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 -mx-1 px-1">
+        {categories.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            className={`text-[11px] px-3 py-1.5 rounded-full whitespace-nowrap transition-all ${
+              activeCategory === cat.id
+                ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/40 font-medium'
+                : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-gray-300'
+            }`}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </div>
+
+      {/* İçerik */}
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="bg-[#1e293b] rounded-xl p-3 animate-pulse flex gap-3">
+              <div className="w-20 h-14 bg-gray-800 rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3.5 bg-gray-800 rounded w-3/4" />
+                <div className="h-3 bg-gray-800 rounded w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : error ? (
+        <div className="bg-[#1e293b] rounded-xl p-6 text-center">
+          <span className="text-3xl block mb-2">📡</span>
+          <p className="text-sm text-gray-400">Haber akışı yüklenemedi</p>
+          <button
+            onClick={() => fetchNews(activeCategory)}
+            className="mt-2 text-xs text-blue-400 hover:text-blue-300"
+          >
+            Tekrar dene
+          </button>
+        </div>
+      ) : news.length === 0 ? (
+        <div className="bg-[#1e293b] rounded-xl p-6 text-center">
+          <p className="text-sm text-gray-500">Bu kategoride haber bulunamadı</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {/* İlk haber — büyük kart */}
+          {news[0] && (
+            <a
+              href={news[0].link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-[#1e293b] rounded-xl overflow-hidden hover:bg-[#263348] transition-colors group"
+            >
+              {news[0].image && (
+                <div className="relative aspect-[2/1] overflow-hidden">
+                  <img
+                    src={news[0].image}
+                    alt=""
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#1e293b] via-transparent to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3">
+                    <h4 className="text-sm font-semibold leading-snug line-clamp-2">{news[0].title}</h4>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">{news[0].source}</span>
+                      <span className="text-[10px] text-gray-500">{timeAgo(news[0].pubDate)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!news[0].image && (
+                <div className="p-4">
+                  <h4 className="text-sm font-semibold leading-snug line-clamp-2">{news[0].title}</h4>
+                  {news[0].description && (
+                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{news[0].description}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">{news[0].source}</span>
+                    <span className="text-[10px] text-gray-500">{timeAgo(news[0].pubDate)}</span>
+                  </div>
+                </div>
+              )}
+            </a>
+          )}
+
+          {/* Diğer haberler — kompakt liste */}
+          {news.slice(1).map((item) => (
+            <a
+              key={item.id}
+              href={item.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex gap-3 bg-[#1e293b] rounded-xl p-3 hover:bg-[#263348] transition-colors group"
+            >
+              {item.image && (
+                <div className="w-20 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-800">
+                  <img
+                    src={item.image}
+                    alt=""
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <h4 className="text-xs font-medium leading-snug line-clamp-2 group-hover:text-blue-400 transition-colors">
+                  {item.title}
+                </h4>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className="text-[10px] px-1.5 py-0.5 bg-white/5 text-gray-400 rounded">{item.source}</span>
+                  <span className="text-[10px] text-gray-600">{timeAgo(item.pubDate)}</span>
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// =============================================
 // LIVE BANNER
 // =============================================
 function LiveBanner({ liveVideos, onSelect, onMultiView, multiSelectVideos, onMultiSelectToggle }: { liveVideos: Video[]; onSelect: (v: Video) => void; onMultiView: (videos: Video[]) => void; multiSelectVideos: Video[]; onMultiSelectToggle: (v: Video) => void }) {
@@ -2209,12 +2415,15 @@ export default function AppPage() {
               Zap butonuyla hızlı geçiş
               ============================================= */}
           {selectedTeam === 'haber' && (
-            <NewsTVSection
-              channels={filteredChannels}
-              videos={videos}
-              loading={loading}
-              onStartMultiView={handleStartMultiView}
-            />
+            <>
+              <NewsTVSection
+                channels={filteredChannels}
+                videos={videos}
+                loading={loading}
+                onStartMultiView={handleStartMultiView}
+              />
+              <NewsFeedSection />
+            </>
           )}
 
           {/* Matching Channels — futbol için */}
