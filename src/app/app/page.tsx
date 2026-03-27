@@ -232,6 +232,51 @@ function MultiViewPlayer({
     return () => window.removeEventListener('keydown', handler);
   }, [videos.length, activeAudioIndex, onAudioSwitch, onClose, focusIndex]);
 
+  // Auto-advance: listen for YouTube video end messages from iframes
+  useEffect(() => {
+    if (videos.length <= 1) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      // YouTube sends postMessage events with player state changes
+      if (!event.data || typeof event.data !== 'string') return;
+      try {
+        const data = JSON.parse(event.data);
+        // YouTube state 0 = ended
+        if (data.event === 'onStateChange' && data.info === 0) {
+          // Find which iframe sent this message
+          const endedIdx = iframeRefs.current.findIndex(
+            (iframe) => iframe?.contentWindow === event.source
+          );
+          // If the ended video is the currently focused/active one, auto-advance
+          if (endedIdx !== -1 && endedIdx === (focusIndex ?? activeAudioIndex)) {
+            const nextIdx = (endedIdx + 1) % videos.length;
+            onAudioSwitch(nextIdx);
+            if (focusIndex !== null) setFocusIndex(nextIdx);
+          }
+        }
+      } catch {
+        // Not a valid JSON message, ignore
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [videos.length, focusIndex, activeAudioIndex, onAudioSwitch]);
+
+  // Enable YouTube JS API event listening on iframes
+  useEffect(() => {
+    // Tell each iframe to start sending state change events
+    const timer = setTimeout(() => {
+      iframeRefs.current.forEach((iframe) => {
+        if (!iframe?.contentWindow) return;
+        try {
+          iframe.contentWindow.postMessage('{"event":"listening","id":1}', '*');
+        } catch {}
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [videos.length]);
+
   // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -986,10 +1031,18 @@ function PlayerModal({
   const playerRef = useRef<any>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const autoplayNextRef = useRef(autoplayNext);
+  const allVideosRef = useRef(allVideos);
+  const onVideoEndRef = useRef(onVideoEnd);
   const [resumeTime, setResumeTime] = useState<number>(0);
   const [showResumeToast, setShowResumeToast] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
+
+  // Keep refs in sync with latest props
+  useEffect(() => { autoplayNextRef.current = autoplayNext; }, [autoplayNext]);
+  useEffect(() => { allVideosRef.current = allVideos; }, [allVideos]);
+  useEffect(() => { onVideoEndRef.current = onVideoEnd; }, [onVideoEnd]);
 
   const videoId = video ? (video.ytVideoId || extractVideoId(video.url)) : '';
   const currentIdx = video ? allVideos.findIndex((v) => v.id === video.id) : -1;
@@ -1112,8 +1165,9 @@ function PlayerModal({
             onStateChange: (event: any) => {
               if (destroyed) return;
               if (event.data === 0) {
+                // Video ended
                 clearVideoProgress(currentVideoIdRef.current);
-                if (autoplayNext && allVideos.length > 1) {
+                if (autoplayNextRef.current && allVideosRef.current.length > 1) {
                   let count = 5;
                   setCountdown(count);
                   countdownRef.current = setInterval(() => {
@@ -1122,11 +1176,12 @@ function PlayerModal({
                     if (count <= 0) {
                       if (countdownRef.current) clearInterval(countdownRef.current);
                       setCountdown(null);
-                      onVideoEnd();
+                      onVideoEndRef.current();
                     }
                   }, 1000);
                 }
               } else if (event.data === 1) {
+                // Video playing — cancel countdown if user manually plays
                 if (countdownRef.current) {
                   clearInterval(countdownRef.current);
                   setCountdown(null);
