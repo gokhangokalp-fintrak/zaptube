@@ -1186,37 +1186,85 @@ function SponsorSidebar() {
 // Kurumsal: banka, finans, teknoloji, otomotiv
 // =============================================
 function NewsSponsorSidebar() {
+  const [markets, setMarkets] = useState<{ symbol: string; label: string; value: string; change: string; changePercent: string; direction: string }[]>([]);
+  const [marketLoading, setMarketLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState('');
+
+  useEffect(() => {
+    async function fetchMarkets() {
+      try {
+        const res = await fetch('/api/markets');
+        if (!res.ok) throw new Error('fetch failed');
+        const data = await res.json();
+        if (data.items?.length > 0) setMarkets(data.items);
+        if (data.updatedAt) {
+          const d = new Date(data.updatedAt);
+          setLastUpdated(d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }));
+        }
+      } catch { /* silent */ }
+      finally { setMarketLoading(false); }
+    }
+    fetchMarkets();
+    // 2 dakikada bir güncelle
+    const interval = setInterval(fetchMarkets, 120000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="space-y-4">
-      {/* Piyasa Widget */}
+      {/* Canlı Piyasa Widget */}
       <div className="bg-gradient-to-br from-[#0f1729] to-[#1e293b] rounded-xl border border-blue-500/20 overflow-hidden">
         <div className="px-3 py-2 bg-blue-500/10 border-b border-blue-500/20">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-blue-400">PİYASALAR</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 live-pulse"></span>
-          </div>
-          <p className="text-[10px] text-gray-500 mt-0.5">Sponsor alanı</p>
-        </div>
-        <div className="p-3 space-y-2">
-          {[
-            { label: 'USD/TRY', value: '—', change: '' },
-            { label: 'EUR/TRY', value: '—', change: '' },
-            { label: 'BIST 100', value: '—', change: '' },
-            { label: 'Altın/gr', value: '—', change: '' },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
-              <span className="text-[11px] text-gray-400">{item.label}</span>
-              <div className="text-right">
-                <span className="text-xs font-bold text-white">{item.value}</span>
-                <span className="text-[10px] text-gray-600 ml-1">{item.change}</span>
-              </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-blue-400">PİYASALAR</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 live-pulse"></span>
             </div>
-          ))}
-          <p className="text-[9px] text-gray-600 text-center pt-1">Kota sıfırlanınca güncellenecek</p>
+            {lastUpdated && (
+              <span className="text-[9px] text-gray-600">{lastUpdated}</span>
+            )}
+          </div>
+          <p className="text-[10px] text-gray-500 mt-0.5">İş Menkul Değerler sponsorluğunda</p>
+        </div>
+        <div className="p-3 space-y-1">
+          {marketLoading ? (
+            [1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 animate-pulse">
+                <div className="h-3 bg-gray-800 rounded w-16" />
+                <div className="h-3 bg-gray-800 rounded w-20" />
+              </div>
+            ))
+          ) : markets.length > 0 ? (
+            markets.map((item) => (
+              <div key={item.symbol} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                <div>
+                  <span className="text-[11px] font-medium text-gray-300">{item.label}</span>
+                  <span className="text-[9px] text-gray-600 ml-1">{item.symbol}</span>
+                </div>
+                <div className="text-right flex items-center gap-2">
+                  <span className="text-xs font-bold text-white font-mono">{item.value}</span>
+                  {item.changePercent && (
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      item.direction === 'up'
+                        ? 'bg-green-500/15 text-green-400'
+                        : item.direction === 'down'
+                        ? 'bg-red-500/15 text-red-400'
+                        : 'bg-white/5 text-gray-500'
+                    }`}>
+                      {item.direction === 'up' ? '▲' : item.direction === 'down' ? '▼' : ''}
+                      {item.changePercent}%
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-[10px] text-gray-600 text-center py-3">Piyasa verisi yüklenemedi</p>
+          )}
         </div>
       </div>
 
-      {/* Kurumsal Sponsor Alanı */}
+      {/* Kurumsal Sponsor Alanı 1 */}
       <div className="bg-[#1e293b] rounded-xl border border-white/5 overflow-hidden">
         <div className="p-4 text-center">
           <div className="w-full h-24 rounded-lg bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/10 flex items-center justify-center mb-3">
@@ -1230,7 +1278,7 @@ function NewsSponsorSidebar() {
         </div>
       </div>
 
-      {/* İkinci Sponsor Alanı */}
+      {/* Kurumsal Sponsor Alanı 2 */}
       <div className="bg-[#1e293b] rounded-xl border border-white/5 overflow-hidden">
         <div className="p-4 text-center">
           <div className="w-full h-20 rounded-lg bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border border-emerald-500/10 flex items-center justify-center mb-3">
@@ -1309,11 +1357,12 @@ function LiveEmptyState() {
 // =============================================
 // NEWS TV SECTION — Canlı haber kanalları TV deneyimi
 // =============================================
-function NewsTVSection({ channels, videos, loading, onStartMultiView }: {
+function NewsTVSection({ channels, videos, loading, onStartMultiView, multiViewActive }: {
   channels: Channel[];
   videos: Video[];
   loading: boolean;
   onStartMultiView: (videos: Video[]) => void;
+  multiViewActive: boolean;
 }) {
   const [activeChannelIdx, setActiveChannelIdx] = useState(0);
   const [autoZap, setAutoZap] = useState(false);
@@ -1422,9 +1471,17 @@ function NewsTVSection({ channels, videos, loading, onStartMultiView }: {
 
       {/* Ana player */}
       <div className="bg-[#0f172a] rounded-2xl overflow-hidden ring-1 ring-white/5">
-        {/* Büyük video */}
+        {/* Büyük video — multi-view açıkken gizle */}
         <div className="relative aspect-video bg-black">
-          {activeVideo ? (
+          {multiViewActive ? (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-600">
+              <div className="text-center">
+                <span className="text-4xl block mb-2">📺</span>
+                <p className="text-sm text-blue-400">Multi-View modunda izliyorsunuz</p>
+                <p className="text-xs text-gray-600 mt-1">{channels.length} kanal aynı anda</p>
+              </div>
+            </div>
+          ) : activeVideo ? (
             <iframe
               key={activeVideo.ytVideoId}
               src={`https://www.youtube.com/embed/${activeVideo.ytVideoId}?autoplay=1&mute=0&rel=0&modestbranding=1`}
@@ -2541,6 +2598,7 @@ export default function AppPage() {
                 videos={videos}
                 loading={loading}
                 onStartMultiView={handleStartMultiView}
+                multiViewActive={multiViewVideos.length > 0}
               />
               <NewsFeedSection />
             </>
@@ -2693,7 +2751,13 @@ export default function AppPage() {
         {/* Right: Sidebar (hidden on mobile) */}
         <div className="hidden lg:block w-96 shrink-0">
           <div className="sticky top-20 space-y-4">
-            {appMode === 'spor' ? (
+            {appMode === 'haber' ? (
+              <>
+                <NewsSponsorSidebar />
+                <ChatPanel />
+                <UserProfileWidget />
+              </>
+            ) : (
               <>
                 <SponsorSidebar />
                 <ChatPanel />
@@ -2701,12 +2765,6 @@ export default function AppPage() {
                 <LiveScoreWidget />
                 <FixturesWidget />
                 <StandingsWidget />
-                <UserProfileWidget />
-              </>
-            ) : (
-              <>
-                <NewsSponsorSidebar />
-                <ChatPanel />
                 <UserProfileWidget />
               </>
             )}

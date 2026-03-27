@@ -58,12 +58,8 @@ export async function middleware(request: NextRequest) {
   // /app routes: allow guest access (no auth required)
   // Chat, notifications etc. are restricted in the components themselves
 
-  // If user is logged in and visits landing page, redirect to /app
-  if (request.nextUrl.pathname === '/' && user) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/app';
-    return NextResponse.redirect(url);
-  }
+  // Landing page (/) artık Gate sayfası — herkes görebilir
+  // Giriş yapmış kullanıcılar da mod seçimi yapabilmeli
 
   return supabaseResponse;
 }
