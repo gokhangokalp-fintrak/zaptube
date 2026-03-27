@@ -97,6 +97,104 @@ function ZapBar({
 }
 
 // =============================================
+// MULTI-VIEW MARKET PANEL — Piyasa verileri for multi-view sidebar
+// =============================================
+function MultiViewMarketPanel() {
+  const [marketGroups, setMarketGroups] = useState<{ id: string; name: string; emoji: string; items: { symbol: string; label: string; value: string; change: string; changePercent: string; direction: string }[] }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState('');
+
+  useEffect(() => {
+    async function fetchMarkets() {
+      try {
+        const res = await fetch('/api/markets');
+        if (!res.ok) throw new Error('fetch failed');
+        const data = await res.json();
+        if (data.groups?.length > 0) setMarketGroups(data.groups);
+        if (data.updatedAt) {
+          const d = new Date(data.updatedAt);
+          setLastUpdated(d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }));
+        }
+      } catch { /* silent */ }
+      finally { setLoading(false); }
+    }
+    fetchMarkets();
+    const interval = setInterval(fetchMarkets, 120000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="px-3 py-2.5 border-b border-white/10 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">📊</span>
+          <span className="text-xs font-bold text-blue-400">PİYASALAR</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 live-pulse"></span>
+        </div>
+        {lastUpdated && <span className="text-[9px] text-gray-600">{lastUpdated}</span>}
+      </div>
+      <p className="text-[9px] text-gray-500 px-3 py-1 border-b border-white/5">İş Yatırım sponsorluğunda</p>
+
+      {/* Market Data */}
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="p-3 space-y-2">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+              <div key={i} className="flex items-center justify-between py-1.5 animate-pulse">
+                <div className="h-3 bg-gray-800 rounded w-16" />
+                <div className="h-3 bg-gray-800 rounded w-14" />
+              </div>
+            ))}
+          </div>
+        ) : marketGroups.length > 0 ? (
+          <div>
+            {marketGroups.map(group => (
+              <div key={group.id} className="border-b border-white/5 last:border-0">
+                <div className="px-3 py-1.5 bg-white/[0.02]">
+                  <span className="text-[10px] font-semibold text-gray-400">
+                    {group.emoji} {group.name}
+                  </span>
+                </div>
+                <div className="px-3 pb-1">
+                  {group.items.map(item => (
+                    <div key={item.symbol} className="flex items-center justify-between py-1.5">
+                      <span className="text-[11px] text-gray-400">{item.label}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-white font-mono">{item.value}</span>
+                        {item.changePercent && (
+                          <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${
+                            item.direction === 'up' ? 'bg-green-500/15 text-green-400'
+                            : item.direction === 'down' ? 'bg-red-500/15 text-red-400'
+                            : 'bg-white/5 text-gray-500'
+                          }`}>
+                            {item.direction === 'up' ? '▲' : item.direction === 'down' ? '▼' : ''}{item.changePercent}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[10px] text-gray-600 text-center py-6">Piyasa verisi yüklenemedi</p>
+        )}
+      </div>
+
+      {/* Sponsor footer */}
+      <div className="shrink-0 px-3 py-2 border-t border-white/5 text-center">
+        <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-2">
+          <p className="text-[10px] text-blue-400 font-bold">İş Yatırım</p>
+          <p className="text-[9px] text-gray-500 mt-0.5">Profesyonel yatırım çözümleri</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================
 // MULTI-VIEW — Side by side viewing
 // =============================================
 function MultiViewPlayer({
@@ -270,7 +368,7 @@ function MultiViewPlayer({
             <span className="text-2xl">⚡</span>
             <div>
               <p className="text-white font-bold text-sm">ZAP!</p>
-              <p className="text-emerald-400 text-[10px] font-medium">Nesine ile kanal değiştir</p>
+              <p className="text-emerald-400 text-[10px] font-medium">ZapTube ile kanal değiştir</p>
             </div>
           </div>
         </div>
@@ -327,17 +425,17 @@ function MultiViewPlayer({
       {/* Sponsor Bar — video altı ticker */}
       <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-6 px-4 py-1 shrink-0 border-b border-white/5" style={{ background: 'rgba(17,24,39,0.7)' }}>
         <span className="text-[9px] text-gray-600">SPONSOR</span>
-        <span className="text-[10px] text-emerald-400/80 font-medium text-center">⚡ Bu yayın <strong>Nesine.com</strong> sponsorluğunda</span>
+        <span className="text-[10px] text-blue-400/80 font-medium text-center">📊 Piyasa verileri <strong>İş Yatırım</strong> sponsorluğunda</span>
         <span className="text-[10px] text-gray-600 hidden sm:inline">|</span>
-        <span className="text-[10px] text-orange-400/80 font-medium text-center">📺 Maçlar <strong>beIN SPORTS</strong>&apos;ta</span>
+        <span className="text-[10px] text-purple-400/80 font-medium text-center">🏦 <strong>Türkiye İş Bankası</strong> ile güvenli yatırım</span>
       </div>
 
       {/* 3-Column Layout: Chat | Videos | Ad */}
       <div className="flex flex-1 min-h-0">
 
-        {/* LEFT: Canlı Sohbet — gerçek ChatPanel */}
-        <div className="hidden lg:flex w-72 xl:w-80 shrink-0 overflow-hidden">
-          <ChatPanel />
+        {/* LEFT: Piyasa Verileri */}
+        <div className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col overflow-hidden border-r border-white/5" style={{ background: 'rgba(15,23,36,0.95)' }}>
+          <MultiViewMarketPanel />
         </div>
 
         {/* CENTER: Video Grid veya Focus Mode */}
@@ -394,8 +492,8 @@ function MultiViewPlayer({
                       </div>
                     </div>
                     <div className="absolute bottom-3 right-3 z-20 pointer-events-none">
-                      <span className="px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-emerald-400/80 font-medium backdrop-blur-sm">
-                        ⚡ Nesine sponsorluğunda
+                      <span className="px-2.5 py-1 rounded-lg bg-black/60 text-[10px] text-blue-400/80 font-medium backdrop-blur-sm">
+                        📊 İş Yatırım sponsorluğunda
                       </span>
                     </div>
                   </>
@@ -532,29 +630,27 @@ function MultiViewPlayer({
         {/* RIGHT: Reklam + Kanal Paneli */}
         <div className="hidden xl:flex w-56 shrink-0 flex-col border-l border-white/5 p-3 gap-3" style={{ background: 'rgba(15,23,36,0.95)' }}>
           {/* Sponsor banner */}
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
-            <span className="text-[9px] text-emerald-500/60 font-medium">SPONSOR</span>
+          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-center">
+            <span className="text-[9px] text-blue-500/60 font-medium">SPONSOR</span>
             <div className="mt-2 mb-2">
-              <span className="text-2xl">⚽</span>
+              <span className="text-2xl">📊</span>
             </div>
-            <p className="text-xs text-emerald-400 font-bold">Nesine.com</p>
-            <p className="text-[10px] text-gray-500 mt-1">İddaa&apos;da en yüksek oranlar</p>
-            <a href="https://www.nesine.com" target="_blank" rel="noopener noreferrer"
-              className="mt-2 block px-3 py-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold hover:bg-emerald-500/30 transition-colors">
-              Hemen Oyna →
-            </a>
+            <p className="text-xs text-blue-400 font-bold">İş Yatırım</p>
+            <p className="text-[10px] text-gray-500 mt-1">Profesyonel yatırım çözümleri</p>
+            <div className="mt-2 block px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg text-[10px] font-bold">
+              Yatırıma Başla →
+            </div>
           </div>
 
-          {/* beIN SPORTS */}
-          <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-3 text-center">
-            <span className="text-[9px] text-orange-500/60 font-medium">YAYINCI</span>
-            <div className="mt-2 mb-2"><span className="text-2xl">📺</span></div>
-            <p className="text-xs text-orange-400 font-bold">beIN SPORTS</p>
-            <p className="text-[10px] text-gray-500 mt-1">Tüm maclar tek yerde</p>
-            <a href="https://www.beinsports.com.tr" target="_blank" rel="noopener noreferrer"
-              className="mt-2 block px-3 py-1.5 bg-orange-500/20 text-orange-400 rounded-lg text-[10px] font-bold hover:bg-orange-500/30 transition-colors">
-              İzle →
-            </a>
+          {/* Türkiye İş Bankası */}
+          <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 text-center">
+            <span className="text-[9px] text-purple-500/60 font-medium">SPONSOR</span>
+            <div className="mt-2 mb-2"><span className="text-2xl">🏦</span></div>
+            <p className="text-xs text-purple-400 font-bold">Türkiye İş Bankası</p>
+            <p className="text-[10px] text-gray-500 mt-1">Güvenli bankacılık</p>
+            <div className="mt-2 block px-3 py-1.5 bg-purple-500/20 text-purple-400 rounded-lg text-[10px] font-bold">
+              Detaylı Bilgi →
+            </div>
           </div>
 
           {/* Kanal listesi — büyütülmüş */}
@@ -592,12 +688,12 @@ function MultiViewPlayer({
         </div>
       </div>
 
-      {/* MOBILE CHAT — FAB + overlay (lg altında görünür) */}
+      {/* MOBILE MARKET — FAB + overlay (lg altında görünür) */}
       <button
         onClick={() => setMobileChatOpen(true)}
-        className="lg:hidden fixed bottom-4 right-4 z-[110] w-12 h-12 rounded-full bg-yellow-500/90 text-black flex items-center justify-center shadow-lg shadow-yellow-500/30 active:scale-95 transition-transform"
+        className="lg:hidden fixed bottom-4 right-4 z-[110] w-12 h-12 rounded-full bg-blue-500/90 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 active:scale-95 transition-transform"
       >
-        <span className="text-lg">💬</span>
+        <span className="text-lg">📊</span>
       </button>
 
       {mobileChatOpen && (
@@ -605,15 +701,16 @@ function MultiViewPlayer({
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileChatOpen(false)} />
 
-          {/* Chat drawer — alttan %75 with real ChatPanel */}
+          {/* Market drawer — alttan %75 */}
           <div className="absolute bottom-0 left-0 right-0 h-[75vh] flex flex-col animate-drawer-up" style={{ background: 'rgba(15,23,36,0.98)' }}>
             {/* Handle */}
             <div className="flex justify-center pt-2 pb-1 shrink-0">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
-            <div className="flex-1 min-h-0">
-              <ChatPanel onClose={() => setMobileChatOpen(false)} />
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <MultiViewMarketPanel />
             </div>
+            <button onClick={() => setMobileChatOpen(false)} className="mx-4 mb-3 py-2 rounded-xl bg-white/10 text-gray-400 text-xs hover:bg-white/20 transition-colors">Kapat</button>
           </div>
         </div>
       )}
@@ -1186,9 +1283,18 @@ function SponsorSidebar() {
 // Kurumsal: banka, finans, teknoloji, otomotiv
 // =============================================
 function NewsSponsorSidebar() {
-  const [markets, setMarkets] = useState<{ symbol: string; label: string; value: string; change: string; changePercent: string; direction: string }[]>([]);
+  const [marketGroups, setMarketGroups] = useState<{ id: string; name: string; emoji: string; items: { symbol: string; label: string; value: string; change: string; changePercent: string; direction: string }[] }[]>([]);
   const [marketLoading, setMarketLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState('');
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set(['doviz', 'altin']));
+
+  const toggleCat = (id: string) => {
+    setExpandedCats(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     async function fetchMarkets() {
@@ -1196,7 +1302,7 @@ function NewsSponsorSidebar() {
         const res = await fetch('/api/markets');
         if (!res.ok) throw new Error('fetch failed');
         const data = await res.json();
-        if (data.items?.length > 0) setMarkets(data.items);
+        if (data.groups?.length > 0) setMarketGroups(data.groups);
         if (data.updatedAt) {
           const d = new Date(data.updatedAt);
           setLastUpdated(d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }));
@@ -1205,14 +1311,13 @@ function NewsSponsorSidebar() {
       finally { setMarketLoading(false); }
     }
     fetchMarkets();
-    // 2 dakikada bir güncelle
     const interval = setInterval(fetchMarkets, 120000);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="space-y-4">
-      {/* Canlı Piyasa Widget */}
+    <div className="space-y-3">
+      {/* Piyasa Header */}
       <div className="bg-gradient-to-br from-[#0f1729] to-[#1e293b] rounded-xl border border-blue-500/20 overflow-hidden">
         <div className="px-3 py-2 bg-blue-500/10 border-b border-blue-500/20">
           <div className="flex items-center justify-between">
@@ -1220,78 +1325,83 @@ function NewsSponsorSidebar() {
               <span className="text-xs font-bold text-blue-400">PİYASALAR</span>
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 live-pulse"></span>
             </div>
-            {lastUpdated && (
-              <span className="text-[9px] text-gray-600">{lastUpdated}</span>
-            )}
+            {lastUpdated && <span className="text-[9px] text-gray-600">{lastUpdated}</span>}
           </div>
           <p className="text-[10px] text-gray-500 mt-0.5">İş Menkul Değerler sponsorluğunda</p>
         </div>
-        <div className="p-3 space-y-1">
-          {marketLoading ? (
-            [1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 animate-pulse">
-                <div className="h-3 bg-gray-800 rounded w-16" />
+
+        {marketLoading ? (
+          <div className="p-3 space-y-2">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} className="flex items-center justify-between py-1.5 animate-pulse">
                 <div className="h-3 bg-gray-800 rounded w-20" />
+                <div className="h-3 bg-gray-800 rounded w-16" />
               </div>
-            ))
-          ) : markets.length > 0 ? (
-            markets.map((item) => (
-              <div key={item.symbol} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                <div>
-                  <span className="text-[11px] font-medium text-gray-300">{item.label}</span>
-                  <span className="text-[9px] text-gray-600 ml-1">{item.symbol}</span>
-                </div>
-                <div className="text-right flex items-center gap-2">
-                  <span className="text-xs font-bold text-white font-mono">{item.value}</span>
-                  {item.changePercent && (
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                      item.direction === 'up'
-                        ? 'bg-green-500/15 text-green-400'
-                        : item.direction === 'down'
-                        ? 'bg-red-500/15 text-red-400'
-                        : 'bg-white/5 text-gray-500'
-                    }`}>
-                      {item.direction === 'up' ? '▲' : item.direction === 'down' ? '▼' : ''}
-                      {item.changePercent}%
-                    </span>
-                  )}
-                </div>
+            ))}
+          </div>
+        ) : marketGroups.length > 0 ? (
+          <div className="divide-y divide-white/5">
+            {marketGroups.map(group => (
+              <div key={group.id}>
+                <button onClick={() => toggleCat(group.id)}
+                  className="w-full flex items-center justify-between px-3 py-2 hover:bg-white/5 transition-colors">
+                  <span className="text-[11px] font-semibold text-gray-300">
+                    {group.emoji} {group.name}
+                  </span>
+                  <span className="text-[10px] text-gray-600">{expandedCats.has(group.id) ? '▾' : '▸'} {group.items.length}</span>
+                </button>
+                {expandedCats.has(group.id) && (
+                  <div className="px-3 pb-2 space-y-0.5">
+                    {group.items.map(item => (
+                      <div key={item.symbol} className="flex items-center justify-between py-1.5">
+                        <div>
+                          <span className="text-[11px] text-gray-400">{item.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-white font-mono">{item.value}</span>
+                          {item.changePercent && (
+                            <span className={`text-[9px] font-medium px-1 py-0.5 rounded ${
+                              item.direction === 'up' ? 'bg-green-500/15 text-green-400'
+                              : item.direction === 'down' ? 'bg-red-500/15 text-red-400'
+                              : 'bg-white/5 text-gray-500'
+                            }`}>
+                              {item.direction === 'up' ? '▲' : item.direction === 'down' ? '▼' : ''}{item.changePercent}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            ))
-          ) : (
-            <p className="text-[10px] text-gray-600 text-center py-3">Piyasa verisi yüklenemedi</p>
-          )}
-        </div>
-      </div>
-
-      {/* Kurumsal Sponsor Alanı 1 */}
-      <div className="bg-[#1e293b] rounded-xl border border-white/5 overflow-hidden">
-        <div className="p-4 text-center">
-          <div className="w-full h-24 rounded-lg bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/10 flex items-center justify-center mb-3">
-            <div className="text-center">
-              <span className="text-2xl block mb-1">🏦</span>
-              <p className="text-[10px] text-blue-400/60 font-medium">SPONSOR ALANI</p>
-            </div>
+            ))}
           </div>
-          <p className="text-[10px] text-gray-600">Banka / Finans / Teknoloji</p>
-          <p className="text-[9px] text-gray-700 mt-0.5">Reklam vermek için iletişime geçin</p>
-        </div>
+        ) : (
+          <p className="text-[10px] text-gray-600 text-center py-4">Piyasa verisi yüklenemedi</p>
+        )}
       </div>
 
-      {/* Kurumsal Sponsor Alanı 2 */}
-      <div className="bg-[#1e293b] rounded-xl border border-white/5 overflow-hidden">
-        <div className="p-4 text-center">
-          <div className="w-full h-20 rounded-lg bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border border-emerald-500/10 flex items-center justify-center mb-3">
-            <div className="text-center">
-              <span className="text-xl block mb-1">🚗</span>
-              <p className="text-[10px] text-emerald-400/60 font-medium">SPONSOR ALANI</p>
-            </div>
+      {/* Sponsor Alanları */}
+      <div className="bg-[#1e293b] rounded-xl border border-white/5 p-4 text-center">
+        <div className="w-full h-20 rounded-lg bg-gradient-to-br from-blue-900/30 to-indigo-900/30 border border-blue-500/10 flex items-center justify-center mb-2">
+          <div className="text-center">
+            <span className="text-xl">🏦</span>
+            <p className="text-[9px] text-blue-400/60 font-medium mt-1">SPONSOR ALANI</p>
           </div>
-          <p className="text-[10px] text-gray-600">Otomotiv / Gayrimenkul / E-Ticaret</p>
         </div>
+        <p className="text-[9px] text-gray-600">Banka / Finans / Sigorta</p>
       </div>
 
-      {/* Ad Banner */}
+      <div className="bg-[#1e293b] rounded-xl border border-white/5 p-4 text-center">
+        <div className="w-full h-20 rounded-lg bg-gradient-to-br from-emerald-900/20 to-teal-900/20 border border-emerald-500/10 flex items-center justify-center mb-2">
+          <div className="text-center">
+            <span className="text-xl">🏢</span>
+            <p className="text-[9px] text-emerald-400/60 font-medium mt-1">SPONSOR ALANI</p>
+          </div>
+        </div>
+        <p className="text-[9px] text-gray-600">Otomotiv / Gayrimenkul / E-Ticaret</p>
+      </div>
+
       <AdBanner slot="sidebar" />
     </div>
   );
@@ -1587,6 +1697,7 @@ function NewsFeedSection() {
   ]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
 
   const fetchNews = useCallback(async (cat: string) => {
     setLoading(true);
@@ -1685,11 +1796,9 @@ function NewsFeedSection() {
         <div className="space-y-2">
           {/* İlk haber — büyük kart */}
           {news[0] && (
-            <a
-              href={news[0].link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block bg-[#1e293b] rounded-xl overflow-hidden hover:bg-[#263348] transition-colors group"
+            <button
+              onClick={() => setSelectedNews(news[0])}
+              className="block w-full text-left bg-[#1e293b] rounded-xl overflow-hidden hover:bg-[#263348] transition-colors group"
             >
               {news[0].image && (
                 <div className="relative aspect-[2/1] overflow-hidden">
@@ -1721,17 +1830,15 @@ function NewsFeedSection() {
                   </div>
                 </div>
               )}
-            </a>
+            </button>
           )}
 
           {/* Diğer haberler — kompakt liste */}
           {news.slice(1).map((item) => (
-            <a
+            <button
               key={item.id}
-              href={item.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex gap-3 bg-[#1e293b] rounded-xl p-3 hover:bg-[#263348] transition-colors group"
+              onClick={() => setSelectedNews(item)}
+              className="flex gap-3 w-full text-left bg-[#1e293b] rounded-xl p-3 hover:bg-[#263348] transition-colors group"
             >
               {item.image && (
                 <div className="w-20 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-800">
@@ -1752,8 +1859,71 @@ function NewsFeedSection() {
                   <span className="text-[10px] text-gray-600">{timeAgo(item.pubDate)}</span>
                 </div>
               </div>
-            </a>
+            </button>
           ))}
+
+      {/* Haber Özet Modalı */}
+      {selectedNews && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" onClick={() => setSelectedNews(null)}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div
+            className="relative bg-[#1e293b] rounded-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl border border-white/10 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-[#1e293b] border-b border-white/5 px-4 py-3 flex items-center justify-between z-10 rounded-t-2xl">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded font-medium">{selectedNews.source}</span>
+                <span className="text-[10px] text-gray-500">{timeAgo(selectedNews.pubDate)}</span>
+              </div>
+              <button
+                onClick={() => setSelectedNews(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-gray-400 hover:text-white transition-colors text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Görsel */}
+            {selectedNews.image && (
+              <div className="relative aspect-[2/1] overflow-hidden">
+                <img
+                  src={selectedNews.image}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
+
+            {/* İçerik */}
+            <div className="p-4">
+              <h3 className="text-base font-bold leading-snug mb-3">{selectedNews.title}</h3>
+              {selectedNews.description && (
+                <p className="text-sm text-gray-400 leading-relaxed mb-4">{selectedNews.description}</p>
+              )}
+
+              {/* Kaynağa Git */}
+              <div className="flex items-center gap-2 pt-3 border-t border-white/5">
+                <a
+                  href={selectedNews.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/20 text-blue-400 rounded-xl text-xs font-medium hover:bg-blue-500/30 transition-colors"
+                >
+                  Haberin Tamamını Oku →
+                </a>
+                <button
+                  onClick={() => setSelectedNews(null)}
+                  className="px-4 py-2.5 bg-white/5 text-gray-400 rounded-xl text-xs hover:bg-white/10 transition-colors"
+                >
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
         </div>
       )}
     </section>
@@ -2002,6 +2172,9 @@ export default function AppPage() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+
+  // Haber modu: aktif section (canli-tv | haber-akisi)
+  const [newsSection, setNewsSection] = useState<'canli-tv' | 'haber-akisi'>('canli-tv');
 
   // Multi-view state
   const [multiViewVideos, setMultiViewVideos] = useState<Video[]>([]);
@@ -2441,12 +2614,14 @@ export default function AppPage() {
                 </>
               ) : (
                 <>
-                  <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/15 text-blue-400">
+                  <button onClick={() => setNewsSection('canli-tv')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${newsSection === 'canli-tv' ? 'bg-blue-500/15 text-blue-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                     📺 Canlı TV
-                  </span>
-                  <span className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-300">
+                  </button>
+                  <button onClick={() => setNewsSection('haber-akisi')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${newsSection === 'haber-akisi' ? 'bg-blue-500/15 text-blue-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
                     📰 Haber Akışı
-                  </span>
+                  </button>
                 </>
               )}
             </nav>
@@ -2591,17 +2766,17 @@ export default function AppPage() {
               Büyük aktif kanal + diğer kanalların önizlemeleri
               Zap butonuyla hızlı geçiş
               ============================================= */}
-          {appMode === 'haber' && (
-            <>
-              <NewsTVSection
-                channels={filteredChannels}
-                videos={videos}
-                loading={loading}
-                onStartMultiView={handleStartMultiView}
-                multiViewActive={multiViewVideos.length > 0}
-              />
-              <NewsFeedSection />
-            </>
+          {appMode === 'haber' && newsSection === 'canli-tv' && (
+            <NewsTVSection
+              channels={filteredChannels}
+              videos={videos}
+              loading={loading}
+              onStartMultiView={handleStartMultiView}
+              multiViewActive={multiViewVideos.length > 0}
+            />
+          )}
+          {appMode === 'haber' && newsSection === 'haber-akisi' && (
+            <NewsFeedSection />
           )}
 
           {/* Matching Channels — futbol için */}
@@ -2754,8 +2929,6 @@ export default function AppPage() {
             {appMode === 'haber' ? (
               <>
                 <NewsSponsorSidebar />
-                <ChatPanel />
-                <UserProfileWidget />
               </>
             ) : (
               <>
@@ -2807,8 +2980,6 @@ export default function AppPage() {
               ) : (
                 <>
                   <NewsSponsorSidebar />
-                  <ChatPanel />
-                  <UserProfileWidget />
                 </>
               )}
               </div>
