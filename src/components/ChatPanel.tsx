@@ -168,7 +168,7 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
     // Shared channel per room — all users on same room share this channel
     const channelName = `chat-room:${selectedRoom.id}`;
 
-    // Cleanup previous
+    // Cleanup previous — agresif temizlik, aynı isimli kanalı tamamen kaldır
     if (presenceChannelRef.current) {
       try { supabase.removeChannel(presenceChannelRef.current); } catch {}
       presenceChannelRef.current = null;
@@ -177,6 +177,15 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
       try { supabase.removeChannel(subscriptionRef.current); } catch {}
       subscriptionRef.current = null;
     }
+    // Force remove any stale channel with same name (React StrictMode double-mount fix)
+    try {
+      const existingChannels = supabase.getChannels();
+      existingChannels.forEach((ch: any) => {
+        if (ch.topic === `realtime:${channelName}`) {
+          supabase.removeChannel(ch);
+        }
+      });
+    } catch {}
 
     const channel = supabase.channel(channelName, {
       config: { presence: { key: presenceKey } },

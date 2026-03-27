@@ -99,11 +99,11 @@ async function getUploadsCacheFallback(channelId: string): Promise<Video[] | nul
       .select('data')
       .like('cache_key', `uploads:${channelId}:%`)
       .gt('expires_at', new Date().toISOString())
-      .limit(1)
-      .single();
+      .limit(1);
 
-    if (error || !data) return null;
-    const parsed = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
+    if (error || !data || data.length === 0) return null;
+    const row = data[0];
+    const parsed = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
     return Array.isArray(parsed) ? parsed : null;
   } catch {
     return null;
