@@ -203,12 +203,14 @@ function MultiViewPlayer({
   onAudioSwitch,
   onClose,
   onRemoveVideo,
+  appMode,
 }: {
   videos: Video[];
   activeAudioIndex: number;
   onAudioSwitch: (idx: number) => void;
   onClose: () => void;
   onRemoveVideo: (idx: number) => void;
+  appMode: 'spor' | 'haber';
 }) {
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
   const [zapFlash, setZapFlash] = useState(false);
@@ -433,9 +435,9 @@ function MultiViewPlayer({
       {/* 3-Column Layout: Chat | Videos | Ad */}
       <div className="flex flex-1 min-h-0">
 
-        {/* LEFT: Piyasa Verileri */}
+        {/* LEFT: Haber mode → Piyasa Verileri, Spor mode → Chat Panel */}
         <div className="hidden lg:flex w-72 xl:w-80 shrink-0 flex-col overflow-hidden border-r border-white/5" style={{ background: 'rgba(15,23,36,0.95)' }}>
-          <MultiViewMarketPanel />
+          {appMode === 'haber' ? <MultiViewMarketPanel /> : <ChatPanel />}
         </div>
 
         {/* CENTER: Video Grid veya Focus Mode */}
@@ -629,29 +631,59 @@ function MultiViewPlayer({
 
         {/* RIGHT: Reklam + Kanal Paneli */}
         <div className="hidden xl:flex w-56 shrink-0 flex-col border-l border-white/5 p-3 gap-3" style={{ background: 'rgba(15,23,36,0.95)' }}>
-          {/* Sponsor banner */}
-          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-center">
-            <span className="text-[9px] text-blue-500/60 font-medium">SPONSOR</span>
-            <div className="mt-2 mb-2">
-              <span className="text-2xl">📊</span>
-            </div>
-            <p className="text-xs text-blue-400 font-bold">İş Yatırım</p>
-            <p className="text-[10px] text-gray-500 mt-1">Profesyonel yatırım çözümleri</p>
-            <div className="mt-2 block px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg text-[10px] font-bold">
-              Yatırıma Başla →
-            </div>
-          </div>
+          {appMode === 'haber' ? (
+            <>
+              {/* Haber mode: İş Yatırım and Türkiye İş Bankası */}
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-3 text-center">
+                <span className="text-[9px] text-blue-500/60 font-medium">SPONSOR</span>
+                <div className="mt-2 mb-2">
+                  <span className="text-2xl">📊</span>
+                </div>
+                <p className="text-xs text-blue-400 font-bold">İş Yatırım</p>
+                <p className="text-[10px] text-gray-500 mt-1">Profesyonel yatırım çözümleri</p>
+                <div className="mt-2 block px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg text-[10px] font-bold">
+                  Yatırıma Başla →
+                </div>
+              </div>
 
-          {/* Türkiye İş Bankası */}
-          <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 text-center">
-            <span className="text-[9px] text-purple-500/60 font-medium">SPONSOR</span>
-            <div className="mt-2 mb-2"><span className="text-2xl">🏦</span></div>
-            <p className="text-xs text-purple-400 font-bold">Türkiye İş Bankası</p>
-            <p className="text-[10px] text-gray-500 mt-1">Güvenli bankacılık</p>
-            <div className="mt-2 block px-3 py-1.5 bg-purple-500/20 text-purple-400 rounded-lg text-[10px] font-bold">
-              Detaylı Bilgi →
-            </div>
-          </div>
+              {/* Türkiye İş Bankası */}
+              <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-3 text-center">
+                <span className="text-[9px] text-purple-500/60 font-medium">SPONSOR</span>
+                <div className="mt-2 mb-2"><span className="text-2xl">🏦</span></div>
+                <p className="text-xs text-purple-400 font-bold">Türkiye İş Bankası</p>
+                <p className="text-[10px] text-gray-500 mt-1">Güvenli bankacılık</p>
+                <div className="mt-2 block px-3 py-1.5 bg-purple-500/20 text-purple-400 rounded-lg text-[10px] font-bold">
+                  Detaylı Bilgi →
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Spor mode: Nesine and beIN Sports */}
+              <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3 text-center">
+                <span className="text-[9px] text-yellow-500/60 font-medium">SPONSOR</span>
+                <div className="mt-2 mb-2">
+                  <span className="text-2xl">🎲</span>
+                </div>
+                <p className="text-xs text-yellow-400 font-bold">Nesine</p>
+                <p className="text-[10px] text-gray-500 mt-1">Canlı bahis ve spor</p>
+                <div className="mt-2 block px-3 py-1.5 bg-yellow-500/20 text-yellow-400 rounded-lg text-[10px] font-bold">
+                  Bahise Başla →
+                </div>
+              </div>
+
+              {/* beIN Sports */}
+              <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-center">
+                <span className="text-[9px] text-red-500/60 font-medium">SPONSOR</span>
+                <div className="mt-2 mb-2"><span className="text-2xl">⚽</span></div>
+                <p className="text-xs text-red-400 font-bold">beIN Sports</p>
+                <p className="text-[10px] text-gray-500 mt-1">Spor yayını ve haber</p>
+                <div className="mt-2 block px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold">
+                  Seyret →
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Kanal listesi — büyütülmüş */}
           <div className="flex-1 overflow-y-auto">
@@ -688,12 +720,14 @@ function MultiViewPlayer({
         </div>
       </div>
 
-      {/* MOBILE MARKET — FAB + overlay (lg altında görünür) */}
+      {/* MOBILE — FAB + overlay (lg altında görünür): Haber mode → Market, Spor mode → Chat */}
       <button
         onClick={() => setMobileChatOpen(true)}
-        className="lg:hidden fixed bottom-4 right-4 z-[110] w-12 h-12 rounded-full bg-blue-500/90 text-white flex items-center justify-center shadow-lg shadow-blue-500/30 active:scale-95 transition-transform"
+        className={`lg:hidden fixed bottom-4 right-4 z-[110] w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform ${
+          appMode === 'haber' ? 'bg-blue-500/90 shadow-blue-500/30' : 'bg-green-500/90 shadow-green-500/30'
+        }`}
       >
-        <span className="text-lg">📊</span>
+        <span className="text-lg">{appMode === 'haber' ? '📊' : '💬'}</span>
       </button>
 
       {mobileChatOpen && (
@@ -701,14 +735,14 @@ function MultiViewPlayer({
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileChatOpen(false)} />
 
-          {/* Market drawer — alttan %75 */}
+          {/* Drawer — alttan %75 */}
           <div className="absolute bottom-0 left-0 right-0 h-[75vh] flex flex-col animate-drawer-up" style={{ background: 'rgba(15,23,36,0.98)' }}>
             {/* Handle */}
             <div className="flex justify-center pt-2 pb-1 shrink-0">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <MultiViewMarketPanel />
+              {appMode === 'haber' ? <MultiViewMarketPanel /> : <ChatPanel />}
             </div>
             <button onClick={() => setMobileChatOpen(false)} className="mx-4 mb-3 py-2 rounded-xl bg-white/10 text-gray-400 text-xs hover:bg-white/20 transition-colors">Kapat</button>
           </div>
@@ -2347,16 +2381,25 @@ export default function AppPage() {
 
   // Separate live, regular, and shorts videos
   const SHORTS_THRESHOLD = 90; // 90 saniyeden kısa = Shorts
+  // Shorts tespiti: süre VEYA başlıkta #shorts/#short geçmesi
+  const isShort = (v: Video) => {
+    if (v.live) return false;
+    // Süre bazlı tespit (YouTube API'den gelen veriler)
+    if (v.durationSeconds && v.durationSeconds > 0 && v.durationSeconds < SHORTS_THRESHOLD) return true;
+    // Başlık bazlı tespit (RSS'den gelen veriler için — süre bilgisi yok)
+    if (v.title && /(#shorts|#short|\bshorts\b)/i.test(v.title)) return true;
+    return false;
+  };
   const liveVideos = useMemo(() => videos.filter((v) => v.live), [videos]);
   const regularVideos = useMemo(
     () => videos
-      .filter((v) => !v.live && (!v.durationSeconds || v.durationSeconds >= SHORTS_THRESHOLD))
+      .filter((v) => !v.live && !isShort(v))
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
     [videos]
   );
   const shortsVideos = useMemo(
     () => videos
-      .filter((v) => !v.live && v.durationSeconds && v.durationSeconds > 0 && v.durationSeconds < SHORTS_THRESHOLD)
+      .filter((v) => isShort(v))
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()),
     [videos]
   );
@@ -2551,6 +2594,7 @@ export default function AppPage() {
             setMultiViewAudioIndex((prev) => prev - 1);
           }
         }}
+        appMode={appMode}
       />
 
       {/* Multi-Select Floating Bar */}
