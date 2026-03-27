@@ -122,8 +122,9 @@ function MultiViewPlayer({
   const iframeRefs = useRef<(HTMLIFrameElement | null)[]>([]);
 
   // iOS-safe: tüm iframe'ler muted başlar, aktif olan postMessage ile unmute edilir
+  // Double-tap mute/unmute to ensure it sticks (some browsers ignore first postMessage)
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const sendMuteCommands = () => {
       iframeRefs.current.forEach((iframe, idx) => {
         if (!iframe?.contentWindow) return;
         try {
@@ -132,11 +133,16 @@ function MultiViewPlayer({
             iframe.contentWindow.postMessage('{"event":"command","func":"setVolume","args":[100]}', '*');
           } else {
             iframe.contentWindow.postMessage('{"event":"command","func":"mute","args":""}', '*');
+            iframe.contentWindow.postMessage('{"event":"command","func":"setVolume","args":[0]}', '*');
           }
         } catch {}
       });
-    }, 500);
-    return () => clearTimeout(timer);
+    };
+    // Send immediately + retry after delays to ensure it takes effect
+    const t1 = setTimeout(sendMuteCommands, 300);
+    const t2 = setTimeout(sendMuteCommands, 800);
+    const t3 = setTimeout(sendMuteCommands, 1500);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [activeAudioIndex, videos.length]);
 
   // Auto Director — her 30sn rastgele başka kanala geç
@@ -189,10 +195,10 @@ function MultiViewPlayer({
     return sorted[0]?.likes >= 10 ? sorted[0] : null;
   }, [chatMessages]);
 
-  // 5+ video → otomatik focus mode başlat
+  // 2+ video → otomatik focus mode başlat (1 büyük video + alt strip)
   useEffect(() => {
-    if (videos.length > 4 && focusIndex === null) {
-      setFocusIndex(0);
+    if (videos.length >= 2 && focusIndex === null) {
+      setFocusIndex(activeAudioIndex);
     }
   }, [videos.length]);
 
@@ -203,7 +209,7 @@ function MultiViewPlayer({
       if ((e.target as HTMLElement)?.tagName === 'INPUT' || (e.target as HTMLElement)?.tagName === 'TEXTAREA') return;
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (focusIndex !== null && videos.length <= 4) { setFocusIndex(null); } else { onClose(); }
+        onClose();
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault();
         const nextIdx = (activeAudioIndex + 1) % videos.length;
@@ -220,11 +226,6 @@ function MultiViewPlayer({
           e.preventDefault();
           onAudioSwitch(idx);
           if (focusIndex !== null) setFocusIndex(idx);
-        }
-      } else if (e.key === 'f' || e.key === 'F') {
-        e.preventDefault();
-        if (videos.length <= 4) {
-          setFocusIndex(prev => prev !== null ? null : activeAudioIndex);
         }
       }
     };
@@ -296,9 +297,9 @@ function MultiViewPlayer({
   const isFocusMode = focusIndex !== null;
   const pinnedMsg = chatMessages.find(m => m.pinned);
 
-  // 5+ video → her zaman focus mode (1 büyük + alt bar)
-  // 1-4 video → normal grid veya focus mode (F ile toggle)
-  const forceFocus = videos.length > 4;
+  // 2+ video → her zaman focus mode (1 büyük + alt strip)
+  // 1 video → tam ekran
+  const forceFocus = videos.length >= 2;
   const gridClass = videos.length === 1 ? 'grid-cols-1' : 'grid-cols-2';
   const gridRows = videos.length <= 2 ? 'grid-rows-1' : 'grid-rows-2';
 
@@ -326,19 +327,7 @@ function MultiViewPlayer({
             {videos.length} kanal
           </span>
 
-          {/* Focus Mode toggle — sadece 4 ve altı video için */}
-          {videos.length <= 4 && (
-            <button
-              onClick={() => setFocusIndex(prev => prev !== null ? null : activeAudioIndex)}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                isFocusMode
-                  ? 'bg-yellow-500/20 text-yellow-400 ring-1 ring-yellow-500/30'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              {isFocusMode ? '⊞ Çoklu' : '⊡ Tek'}
-            </button>
-          )}
+          {/* Focus Mode — her zaman aktif */}
 
           {/* Auto Director toggle */}
           <button
@@ -352,7 +341,7 @@ function MultiViewPlayer({
             {autoDirector ? '🎬 ON' : '🎬 Zap'}
           </button>
 
-          <span className="text-[10px] text-gray-600 hidden lg:block">← → geçiş | 1-{videos.length} seç | {videos.length <= 4 ? 'F focus | ' : ''}ESC kapat</span>
+          <span className="text-[10px] text-gray-600 hidden lg:block">← → geçiş | 1-{videos.length} seç | ESC kapat</span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Kanal ses seçici — büyütülmüş */}
@@ -583,7 +572,7 @@ function MultiViewPlayer({
               </div>
 
               {/* Alt preview strip — glow efektli, yatay scroll */}
-              <div className="flex gap-1.5 h-16 sm:h-24 shrink-0 overflow-x-auto px-1 py-1" style={{ scrollSnapType: 'x mandatory' }}>
+              <div className={`flex gap-1.5 shrink-0 overflow-x-auto px-1 py-1 ${videos.length <= 4 ? 'h-24 sm:h-32' : 'h-16 sm:h-24'}`} style={{ scrollSnapType: 'x mandatory' }}>
                 {videos.map((video, idx) => {
                   const videoId = video.ytVideoId || extractVideoId(video.url);
                   const isFocused = idx === focusIndex;
@@ -593,7 +582,7 @@ function MultiViewPlayer({
                       key={video.id}
                       onClick={() => { setFocusIndex(idx); onAudioSwitch(idx); }}
                       className={`relative shrink-0 rounded-lg overflow-hidden transition-all duration-300 ${
-                        videos.length <= 4 ? 'flex-1' : 'w-40'
+                        videos.length <= 4 ? 'flex-1 min-w-[120px]' : 'w-40'
                       } ${
                         isFocused
                           ? 'ring-2 ring-emerald-400 opacity-100 scale-105 shadow-lg shadow-emerald-500/30'
@@ -601,24 +590,18 @@ function MultiViewPlayer({
                       }`}
                       style={{ scrollSnapAlign: 'start' }}
                     >
-                      {/* Thumbnail yerine iframe — ama 5+ de thumbnail kullan (performans) */}
-                      {videos.length <= 4 ? (
-                        <iframe
-                          ref={(el) => { iframeRefs.current[idx] = el; }}
-                          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&mute=1&controls=0`}
-                          title={video.title}
-                          className="w-full h-full pointer-events-none"
-                          allow="autoplay"
-                        />
-                      ) : (
-                        <div className="w-full h-full relative">
-                          {video.thumbnail ? (
-                            <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-900" />
-                          )}
-                        </div>
-                      )}
+                      {/* Always use thumbnails in preview strip to avoid duplicate iframes & dual audio */}
+                      <div className="w-full h-full relative">
+                        {video.thumbnail ? (
+                          <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <img
+                            src={`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
                       {/* Kanal adı + ses ikonu overlay */}
                       <div className="absolute inset-0 flex items-end">
                         <div className={`w-full px-2 py-1.5 ${isFocused ? 'bg-gradient-to-t from-emerald-900/90 to-transparent' : 'bg-gradient-to-t from-black/90 to-transparent'}`}>
