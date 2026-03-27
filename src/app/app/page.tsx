@@ -1531,12 +1531,20 @@ export default function AppPage() {
 
     const fetchVideos = (showLoading = true) => {
       if (showLoading) setLoading(true);
-      getMultiChannelVideos(channelYtIds, apiKey, 5)
+      getMultiChannelVideos(channelYtIds, apiKey, 4)
         .then((result) => {
-          setVideos(Array.isArray(result) ? result : []);
+          const arr = Array.isArray(result) ? result : [];
+          // KRİTİK: API boş dönerse mevcut videoları KORU — silme!
+          // YouTube kotası aşıldığında veya hata olduğunda
+          // kullanıcı boş sayfa görmemeli, eski veriler dursun
+          if (arr.length > 0 || showLoading) {
+            setVideos(arr);
+          }
+          // else: polling empty result → mevcut videoları koru
         })
         .catch(() => {
-          setVideos([]);
+          // Hata durumunda mevcut videoları koru, sadece ilk yüklemede boş göster
+          if (showLoading) setVideos([]);
         })
         .finally(() => { if (showLoading) setLoading(false); });
     };

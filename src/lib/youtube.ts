@@ -89,6 +89,27 @@ async function getCached(key: string): Promise<Video[] | null> {
   return null;
 }
 
+// Fallback cache: uploads için farklı maxResults ile cache'de veri ara
+// Örn: uploads:channelId:4 miss ama uploads:channelId:2 var → onu kullan
+async function getUploadsCacheFallback(channelId: string): Promise<Video[] | null> {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('video_cache')
+      .select('data')
+      .like('cache_key', `uploads:${channelId}:%`)
+      .gt('expires_at', new Date().toISOString())
+      .limit(1)
+      .single();
+
+    if (error || !data) return null;
+    const parsed = typeof data.data === 'string' ? JSON.parse(data.data) : data.data;
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 async function setCache(key: string, data: Video[], ttlHours: number = 2): Promise<void> {
   // Write to both levels
   setL1Cache(key, data);
@@ -145,7 +166,9 @@ async function fetchChannelUploads(
 
     if (!playlistRes.ok) {
       console.error(`PlaylistItems failed for ${channelId}:`, playlistRes.status);
-      return [];
+      // API hata verdi — cache'de eski veri varsa onu dön
+      const fallback = await getUploadsCacheFallback(channelId);
+      return fallback || [];
     }
 
     const playlistData = await playlistRes.json();
@@ -173,7 +196,8 @@ async function fetchChannelUploads(
 
     if (!detailsRes.ok) {
       console.error('Video details failed:', detailsRes.status);
-      return [];
+      const fallback = await getUploadsCacheFallback(channelId);
+      return fallback || [];
     }
 
     const detailsData = await detailsRes.json();
@@ -202,6 +226,9 @@ async function fetchChannelUploads(
       };
     });
 
+    // Boş sonucu cache'leme — API hatası olabilir, sonraki poll tekrar denesin
+    if (videos.length === 0) return videos;
+
     // Saate göre akıllı cache — canlı yayınları kaçırmamak için prime time'da kısa
     // 02-10: 4 saat  — kimse video yüklemez, ölü saat
     // 10-17: 1 saat  — gündüz video yükleme aktif
@@ -212,6 +239,12 @@ async function fetchChannelUploads(
     return videos;
   } catch (error) {
     console.error('fetchChannelUploads error:', error);
+    // API hata verdi — cache'de farklı key ile eski veri varsa onu dön
+    const fallback = await getUploadsCacheFallback(channelId);
+    if (fallback && fallback.length > 0) {
+      console.log(`Using fallback cache for ${channelId} (${fallback.length} videos)`);
+      return fallback;
+    }
     return [];
   }
 }
@@ -348,8 +381,9 @@ async function fetchLiveStreams(
     const items = data.items || [];
     const cacheTTL = getLiveCacheTTL();
     if (items.length === 0) {
-      // Boş sonucu da cache'le — gereksiz tekrar sorgu yapma
-      await setCache(cacheKey, [], cacheTTL);
+      // Canlı yayın yok — kısa süre cache'le ki gereksiz tekrar sorgu yapmasın
+      // Ama çok uzun cache'leme — canlı başlayınca hemen yakalayalım
+      await setCache(cacheKey, [], Math.min(cacheTTL, 10 / 60)); // max 10 dk
       return [];
     }
 
@@ -452,10 +486,15 @@ export async function getMultiChannelVideos(
     return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
   });
 
+  // KRİTİK: Boş sonucu ASLA cache'leme!
+  // YouTube API kota aşımı veya hata döndüğünde boş sonuç gelir.
+  // Bunu cache'lersek, sonraki pollarda da boş dönecek ve kullanıcı
+  // video göremeyecek. Cache'lemezek, sonraki poll tekrar dener.
+  if (sorted.length === 0) {
+    return sorted;
+  }
+
   // Akıllı multi-channel cache
-  // Canlı varsa: live cache TTL (3dk pik, 5dk akşam vb.)
-  // Canlı yoksa: kısa cache — canlı başlarsa hemen yakalansın!
-  // Gece ölü saatlerde uzun, prime time'da kısa
   const hasLive = sorted.some(v => v.live);
   const multiHour = new Date().getHours();
   const noLiveTTL = (multiHour >= 2 && multiHour < 10) ? 2        // 2 saat — gece ölü saat
