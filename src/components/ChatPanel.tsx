@@ -159,32 +159,43 @@ export default function ChatPanel({ onClose }: { onClose?: () => void }) {
   }, [showMenu]);
 
   // Real online count using Supabase Presence
+  const presenceIdRef = useRef(`chat-${Math.random().toString(36).slice(2)}`);
   useEffect(() => {
     const supabase = getSupabase();
-    const presenceChannel = supabase.channel('online-users', {
-      config: { presence: { key: user?.id || `guest-${Math.random().toString(36).slice(2)}` } },
+    // Unique channel name per component instance to avoid conflicts
+    const channelName = `online-presence:${presenceIdRef.current}`;
+
+    // First cleanup any existing channel
+    if (presenceChannelRef.current) {
+      try { presenceChannelRef.current.unsubscribe(); } catch {}
+      presenceChannelRef.current = null;
+    }
+
+    const channel = supabase.channel(channelName, {
+      config: { presence: { key: user?.id || presenceIdRef.current } },
     });
 
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        const count = Object.keys(state).length;
-        setOnlineCount(count);
-      })
-      .subscribe(async (status: string) => {
-        if (status === 'SUBSCRIBED') {
-          await presenceChannel.track({
-            user_id: user?.id || 'guest',
-            user_name: user?.user_metadata?.full_name || 'Misafir',
-            online_at: new Date().toISOString(),
-          });
-        }
-      });
+    // Add callbacks BEFORE subscribing
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const count = Object.keys(state).length;
+      setOnlineCount(count);
+    });
 
-    presenceChannelRef.current = presenceChannel;
+    channel.subscribe(async (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({
+          user_id: user?.id || 'guest',
+          user_name: user?.user_metadata?.full_name || 'Misafir',
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
+
+    presenceChannelRef.current = channel;
 
     return () => {
-      presenceChannel.unsubscribe();
+      try { channel.unsubscribe(); } catch {}
     };
   }, [user]);
 
