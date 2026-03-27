@@ -89,11 +89,41 @@ async function getCached(key: string): Promise<Video[] | null> {
   return null;
 }
 
+// Stale cache fallback — süresi dolmuş multi-channel veriyi getir
+// Kota aşımında boş ekran yerine eski veriyi göster
+async function getStaleCacheFallback(keyPrefix: string): Promise<Video[] | null> {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('video_cache')
+      .select('data')
+      .like('cache_key', `${keyPrefix}%`)
+      .order('expires_at', { ascending: false })
+      .limit(1);
+
+    if (!error && data && data.length > 0) {
+      const row = data[0];
+      const parsed = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        console.log(`Using stale multi-channel cache (${parsed.length} videos)`);
+        return parsed;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 // Fallback cache: uploads için farklı maxResults ile cache'de veri ara
 // Örn: uploads:channelId:4 miss ama uploads:channelId:2 var → onu kullan
+// KRİTİK: Önce geçerli cache dene, bulamazsa SÜRESİ DOLMUŞ veriyi de dön!
+// Boş ekran göstermektense eski veri göstermek her zaman daha iyi.
 async function getUploadsCacheFallback(channelId: string): Promise<Video[] | null> {
   try {
     const supabase = createClient();
+
+    // 1. Önce süresi dolmamış cache dene
     const { data, error } = await supabase
       .from('video_cache')
       .select('data')
@@ -101,10 +131,30 @@ async function getUploadsCacheFallback(channelId: string): Promise<Video[] | nul
       .gt('expires_at', new Date().toISOString())
       .limit(1);
 
-    if (error || !data || data.length === 0) return null;
-    const row = data[0];
-    const parsed = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
-    return Array.isArray(parsed) ? parsed : null;
+    if (!error && data && data.length > 0) {
+      const row = data[0];
+      const parsed = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+
+    // 2. Süresi dolmuş eski veriyi de kabul et — boş ekran göstermektense!
+    const { data: staleData, error: staleError } = await supabase
+      .from('video_cache')
+      .select('data')
+      .like('cache_key', `uploads:${channelId}:%`)
+      .order('expires_at', { ascending: false })
+      .limit(1);
+
+    if (!staleError && staleData && staleData.length > 0) {
+      const row = staleData[0];
+      const parsed = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        console.log(`Using STALE cache for ${channelId} (expired but better than empty)`);
+        return parsed;
+      }
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -506,6 +556,13 @@ export async function getMultiChannelVideos(
   // Bunu cache'lersek, sonraki pollarda da boş dönecek ve kullanıcı
   // video göremeyecek. Cache'lemezek, sonraki poll tekrar dener.
   if (sorted.length === 0) {
+    // SON ÇARE: Süresi dolmuş eski cache'den veri getir
+    // Boş ekran göstermektense eski video listesini göster!
+    const stale = await getStaleCacheFallback(`multi:`);
+    if (stale && stale.length > 0) {
+      console.log(`All APIs failed, using stale cache (${stale.length} videos)`);
+      return stale;
+    }
     return sorted;
   }
 

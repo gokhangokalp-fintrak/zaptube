@@ -49,9 +49,15 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('API route error:', error);
+    // Hata durumunda bile boş dönme — client tarafında fallback devreye girsin
     return NextResponse.json(
       { error: 'Failed to fetch videos', videos: [] },
-      { status: 500 }
+      {
+        status: 200, // 200 dön ki client JSON parse edebilsin
+        headers: {
+          'Cache-Control': 'no-store', // Hatalı sonucu cache'leme
+        },
+      }
     );
   }
 }

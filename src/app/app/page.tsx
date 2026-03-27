@@ -2232,7 +2232,7 @@ export default function AppPage() {
       const contentMatch = !selectedContentType || ch.contentTypes.includes(selectedContentType);
       return contentMatch;
     });
-  }, [selectedTeam, selectedContentType]);
+  }, [selectedTeam, selectedContentType, appMode]);
 
   // Fetch videos via SERVER-SIDE API route — kota koruması!
   // Tüm YouTube API çağrıları sunucuda yapılır, L1 cache tüm kullanıcılar için ortak.
@@ -2251,6 +2251,9 @@ export default function AppPage() {
       return;
     }
 
+    // localStorage key — kanallar değişse bile doğru cache'i bulsun
+    const lsKey = `zaptube_videos_${channelYtIds.slice(0, 5).join('_')}`;
+
     const fetchVideos = (showLoading = true) => {
       if (showLoading) setLoading(true);
       const params = new URLSearchParams({
@@ -2261,13 +2264,41 @@ export default function AppPage() {
         .then((res) => res.json())
         .then((data) => {
           const arr = Array.isArray(data?.videos) ? data.videos : [];
-          // KRİTİK: API boş dönerse mevcut videoları KORU — silme!
-          if (arr.length > 0 || showLoading) {
+          if (arr.length > 0) {
+            // Başarılı — videoları göster + localStorage'a kaydet
             setVideos(arr);
+            try { localStorage.setItem(lsKey, JSON.stringify({ videos: arr, ts: Date.now() })); } catch {}
+          } else if (showLoading) {
+            // API boş döndü (kota aşımı vs) — localStorage'dan eski videoları yükle
+            try {
+              const saved = localStorage.getItem(lsKey);
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed.videos) && parsed.videos.length > 0) {
+                  setVideos(parsed.videos);
+                  return; // Eski verileri göster, boş ekran gösterme!
+                }
+              }
+            } catch {}
+            setVideos([]);
           }
+          // showLoading=false (background poll) ve boş → mevcut videoları koru, hiçbir şey yapma
         })
         .catch(() => {
-          if (showLoading) setVideos([]);
+          if (showLoading) {
+            // Hata durumunda da localStorage fallback dene
+            try {
+              const saved = localStorage.getItem(lsKey);
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed.videos) && parsed.videos.length > 0) {
+                  setVideos(parsed.videos);
+                  return;
+                }
+              }
+            } catch {}
+            setVideos([]);
+          }
         })
         .finally(() => { if (showLoading) setLoading(false); });
     };
