@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 
 const NAV_ITEMS = [
   { href: '/app/admin', label: 'Dashboard', icon: '📊' },
+  { href: '/app/admin/users', label: 'Üyeler', icon: '👥' },
   { href: '/app/admin/channels', label: 'Kanallar', icon: '📺' },
   { href: '/app/admin/sponsors', label: 'Reklamlar', icon: '💰' },
 ];

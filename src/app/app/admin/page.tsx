@@ -77,7 +77,7 @@ export default function AdminDashboard() {
   }, []);
 
   const statCards = [
-    { label: 'Kayıtlı Üyeler', value: stats?.registeredUsers ?? '...', icon: '👥', href: '#', color: 'cyan' },
+    { label: 'Kayıtlı Üyeler', value: stats?.registeredUsers ?? '...', icon: '👥', href: '/app/admin/users', color: 'cyan' },
     { label: 'Bugün Ziyaret', value: stats?.trafficToday ?? '...', icon: '📈', href: '#', color: 'yellow', subtitle: stats ? `${stats.uniqueToday} tekil` : '' },
     { label: 'Haftalık Trafik', value: stats?.trafficWeek ?? '...', icon: '📊', href: '#', color: 'pink', subtitle: stats ? `${stats.uniqueWeek} tekil` : '' },
     { label: 'YouTube Kanalları', value: stats?.totalChannels ?? '...', icon: '📺', href: '/app/admin/channels', color: 'red' },
