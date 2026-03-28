@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
 
     // Sonuç özeti
     const liveCount = videosToUpsert.filter(v => v.live).length;
-    const liveChannels = [...new Set(videosToUpsert.filter(v => v.live).map(v => v.channelTitle))];
+    const liveChannels = Array.from(new Set(videosToUpsert.filter(v => v.live).map(v => v.channelTitle)));
 
     return NextResponse.json({
       success: true,
