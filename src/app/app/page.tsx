@@ -2841,28 +2841,8 @@ export default function AppPage() {
             </div>
           )}
 
-          {/* LIVE SECTION — futbol için */}
-          {appMode === 'spor' && (
-            <LiveBanner liveVideos={liveVideos} onSelect={setActiveVideo} onMultiView={handleStartMultiView} multiSelectVideos={multiSelectVideos} onMultiSelectToggle={handleMultiSelectToggle} />
-          )}
-
-          {/* =============================================
-              HABER TV MODU — Canlı haber kanalları grid
-              Büyük aktif kanal + diğer kanalların önizlemeleri
-              Zap butonuyla hızlı geçiş
-              ============================================= */}
-          {appMode === 'haber' && newsSection === 'canli-tv' && (
-            <NewsTVSection
-              channels={filteredChannels}
-              videos={videos}
-              loading={loading}
-              onStartMultiView={handleStartMultiView}
-              multiViewActive={multiViewVideos.length > 0}
-            />
-          )}
-          {appMode === 'haber' && newsSection === 'haber-akisi' && (
-            <NewsFeedSection />
-          )}
+          {/* LIVE SECTION — hem spor hem haber için */}
+          <LiveBanner liveVideos={liveVideos} onSelect={setActiveVideo} onMultiView={handleStartMultiView} multiSelectVideos={multiSelectVideos} onMultiSelectToggle={handleMultiSelectToggle} />
 
           {/* Matching Channels — futbol için */}
           {appMode === 'spor' && filteredChannels.length > 0 && (selectedTeam || selectedContentType) && (
@@ -2890,10 +2870,10 @@ export default function AppPage() {
             </section>
           )}
 
-          {/* Videos Grid — futbol için, haber modunda gizle */}
-          {appMode === 'spor' && <section>
+          {/* Videos Grid — hem spor hem haber */}
+          <section>
             <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
-              🎬 {selectedTeam || selectedContentType ? 'Önerilen Videolar' : 'Son Videolar'}
+              🎬 {appMode === 'haber' ? 'Son Haberler' : (selectedTeam || selectedContentType ? 'Önerilen Videolar' : 'Son Videolar')}
             </h3>
 
             {loading ? (
@@ -2965,10 +2945,10 @@ export default function AppPage() {
                 <p className="text-xs mt-1">YouTube API verileri çekiliyor, biraz bekle veya farklı filtre dene.</p>
               </div>
             )}
-          </section>}
+          </section>
 
-          {/* SHORTS SECTION — kısa videolar, haber modunda gizle */}
-          {appMode === 'spor' && shortsVideos.length > 0 && (
+          {/* SHORTS SECTION — kısa videolar */}
+          {shortsVideos.length > 0 && (
             <section className="mt-6 animate-slide-up">
               <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
                 <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-1.5 py-0.5 rounded">SHORTS</span>
