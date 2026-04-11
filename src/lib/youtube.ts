@@ -395,21 +395,17 @@ export async function searchChannelVideos(
 // 20-02: 0.05 saat (~3dk) — pik saat
 // =============================================
 // KOTA HESABI (server-side, tüm kullanıcılar ortak):
-// Live search = 100 birim. En pahalı çağrı!
-// Uploads zaten canlı yayınları yakalıyor (liveBroadcastContent === 'live')
-// Bu yüzden live search sadece ek güvenlik — çok sık olmasına gerek yok.
+// search.list KALDIRILDI — artık 0 birim!
+// Canlı yayın tespiti fetchChannelUploads içinde yapılıyor.
+// playlistItems.list (1 birim) + videos.list (1 birim) = 2 birim/kanal
 //
-// 02-10: 2 saat     →  4 çağrı × 100 =    400 birim
-// 10-17: 30 dk      → 14 çağrı × 100 =  1.400 birim
-// 17-20: 15 dk      → 12 çağrı × 100 =  1.200 birim
-// 20-02: 10 dk      → 36 çağrı × 100 =  3.600 birim
-// TOPLAM live search:                    ~6.600 birim/gün
+// 15 kanal × 2 birim = 30 birim per yenileme
+// 02-10: 2 saat cache  →  4 yenileme × 30 =  120 birim
+// 10-17: 1 saat cache  →  7 yenileme × 30 =  210 birim
+// 17-02: 15 dk cache   → 36 yenileme × 30 = 1.080 birim
 //
-// Uploads (15 kanal × 2 birim = 30 birim per yenileme):
-// Gece 4 saat cache, gündüz 1 saat, prime 15 dk
-// ~60 yenileme × 30 =                   ~1.800 birim/gün
-//
-// GÜNLÜK TOPLAM:                         ~8.400 birim/gün ✅ (10K kotanın altında)
+// GÜNLÜK TOPLAM:                             ~1.410 birim/gün ✅
+// (10K kotanın %14'ü — çok güvenli!)
 function getLiveCacheTTL(): number {
   const hour = new Date().getHours();
   if (hour >= 2 && hour < 10) return 2;        // 2 saat — ölü saat
@@ -418,90 +414,13 @@ function getLiveCacheTTL(): number {
   return 10 / 60;                                // 10 dk — pik saat (20-02)
 }
 
-async function fetchLiveStreams(
-  channelIds: string[],
-  apiKey: string
-): Promise<Video[]> {
-  const cacheKey = `live:all`;
-  const cached = await getCached(cacheKey);
-  if (cached) return cached;
-
-  try {
-    // Geniş arama — tüm Türkçe futbol canlı yayınlarını yakala
-    // q parametresini dar tutmak yerine geniş tutuyoruz ki
-    // milli takım, Süper Lig, transfer, analiz hepsi yakalansın
-    const params = new URLSearchParams({
-      part: 'snippet',
-      q: 'futbol',
-      eventType: 'live',
-      type: 'video',
-      maxResults: '50',
-      relevanceLanguage: 'tr',
-      key: apiKey,
-    });
-
-    const res = await fetch(`${YOUTUBE_API_BASE}/search?${params}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    const items = data.items || [];
-    const cacheTTL = getLiveCacheTTL();
-    if (items.length === 0) {
-      // Canlı yayın yok — kısa süre cache'le ki gereksiz tekrar sorgu yapmasın
-      // Ama çok uzun cache'leme — canlı başlayınca hemen yakalayalım
-      await setCache(cacheKey, [], Math.min(cacheTTL, 10 / 60)); // max 10 dk
-      return [];
-    }
-
-    // Filter: only keep videos from OUR channels
-    const channelSet = new Set(channelIds);
-    const ourItems = items.filter((item: any) =>
-      channelSet.has(item.snippet?.channelId)
-    );
-
-    if (ourItems.length === 0) {
-      await setCache(cacheKey, [], cacheTTL);
-      return [];
-    }
-
-    // Get full details (1 birim per 50 videos — cheap!)
-    const videoIds = ourItems.map((item: any) => item.id?.videoId).filter(Boolean).join(',');
-    if (!videoIds) return [];
-
-    const detailsRes = await fetch(
-      `${YOUTUBE_API_BASE}/videos?` +
-        new URLSearchParams({
-          part: 'snippet,statistics,liveStreamingDetails',
-          id: videoIds,
-          key: apiKey,
-        })
-    );
-    if (!detailsRes.ok) return [];
-    const detailsData = await detailsRes.json();
-
-    const liveVideos: Video[] = (detailsData.items || []).map((item: any) => ({
-      id: item.id,
-      title: item.snippet.title,
-      channelTitle: item.snippet.channelTitle,
-      channelId: item.snippet.channelId,
-      thumbnail:
-        item.snippet.thumbnails?.high?.url ||
-        item.snippet.thumbnails?.medium?.url || '',
-      publishedAt: item.snippet.publishedAt,
-      viewCount: item.liveStreamingDetails?.concurrentViewers || item.statistics?.viewCount,
-      duration: 'CANLI',
-      url: `https://www.youtube.com/watch?v=${item.id}`,
-      ytVideoId: item.id,
-      live: true,
-    }));
-
-    // Akıllı cache — saate göre değişir (3dk pik, 2 saat gece)
-    await setCache(cacheKey, liveVideos, cacheTTL);
-    return liveVideos;
-  } catch (error) {
-    console.error('fetchLiveStreams error:', error);
-    return [];
-  }
-}
+// =============================================
+// fetchLiveStreams KALDIRILDI!
+// Canlı yayın tespiti artık fetchChannelUploads içinde yapılıyor.
+// videos.list zaten liveBroadcastContent === 'live' döndürüyor.
+// maxResults artırıldı (10) — canlı yayınları kaçırmamak için.
+// Bu sayede search.list çağrısı YOK → günde 0 birim tasarruf!
+// =============================================
 
 // =============================================
 // MULTI-CHANNEL: Parallel fetch with smart caching
@@ -515,20 +434,18 @@ export async function getMultiChannelVideos(
   const cached = await getCached(cacheKey);
   if (cached) return cached;
 
-  // Fetch uploads AND live streams in parallel
-  const [uploadsResults, liveVideos] = await Promise.all([
-    Promise.allSettled(
-      channelIds.map((id) => fetchChannelUploads(id, apiKey, maxPerChannel))
-    ),
-    fetchLiveStreams(channelIds, apiKey),
-  ]);
+  // Fetch uploads from all channels in parallel
+  // fetchChannelUploads zaten liveBroadcastContent === 'live' kontrolü yapıyor
+  // Canlı yayınlar otomatik olarak live: true ile işaretleniyor
+  // maxPerChannel'den daha fazla çekelim ki canlı yayınları kaçırmayalım
+  const fetchCount = Math.max(maxPerChannel, 10); // en az 10 video çek
+  const uploadsResults = await Promise.allSettled(
+    channelIds.map((id) => fetchChannelUploads(id, apiKey, fetchCount))
+  );
 
   const allVideos: Video[] = [];
 
-  // Add live streams first (they should appear at top)
-  allVideos.push(...liveVideos);
-
-  // Add uploads
+  // Add uploads (live ones already marked with live: true)
   uploadsResults.forEach((result) => {
     if (result.status === 'fulfilled') {
       allVideos.push(...result.value);
