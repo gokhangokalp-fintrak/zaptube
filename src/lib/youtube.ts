@@ -254,10 +254,19 @@ async function fetchChannelUploads(
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
       // YouTube API bazen bitmiş yayınları hâlâ 'live' olarak işaretliyor.
-      // actualEndTime varsa yayın bitmiş demektir — publishedAt güvenilmez (video oluşturma tarihi)
+      // Güvenli kontrol zinciri:
+      // 1) actualEndTime varsa kesin bitmiş
+      // 2) actualStartTime 8+ saat önceyse büyük ihtimalle bitmiş
+      // 3) hiçbiri yoksa publishedAt 24+ saat → bayat
       const apiSaysLive = item.snippet?.liveBroadcastContent === 'live';
       const hasEnded = !!item.liveStreamingDetails?.actualEndTime;
-      const isLive = apiSaysLive && !hasEnded;
+      const startTime = item.liveStreamingDetails?.actualStartTime;
+      const startAge = startTime ? Date.now() - new Date(startTime).getTime() : 0;
+      const pubAge = Date.now() - new Date(item.snippet?.publishedAt || 0).getTime();
+      const isStale = hasEnded
+        || (startTime && startAge > 8 * 3600_000)
+        || (!startTime && pubAge > 24 * 3600_000);
+      const isLive = apiSaysLive && !isStale;
       const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
@@ -355,10 +364,19 @@ export async function searchChannelVideos(
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
       // YouTube API bazen bitmiş yayınları hâlâ 'live' olarak işaretliyor.
-      // actualEndTime varsa yayın bitmiş demektir — publishedAt güvenilmez (video oluşturma tarihi)
+      // Güvenli kontrol zinciri:
+      // 1) actualEndTime varsa kesin bitmiş
+      // 2) actualStartTime 8+ saat önceyse büyük ihtimalle bitmiş
+      // 3) hiçbiri yoksa publishedAt 24+ saat → bayat
       const apiSaysLive = item.snippet?.liveBroadcastContent === 'live';
       const hasEnded = !!item.liveStreamingDetails?.actualEndTime;
-      const isLive = apiSaysLive && !hasEnded;
+      const startTime = item.liveStreamingDetails?.actualStartTime;
+      const startAge = startTime ? Date.now() - new Date(startTime).getTime() : 0;
+      const pubAge = Date.now() - new Date(item.snippet?.publishedAt || 0).getTime();
+      const isStale = hasEnded
+        || (startTime && startAge > 8 * 3600_000)
+        || (!startTime && pubAge > 24 * 3600_000);
+      const isLive = apiSaysLive && !isStale;
       const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
