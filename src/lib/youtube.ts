@@ -254,12 +254,10 @@ async function fetchChannelUploads(
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
       // YouTube API bazen bitmiş yayınları hâlâ 'live' olarak işaretliyor.
-      // 3 kontrol: 1) API live diyor mu, 2) actualEndTime yok mu, 3) 12 saatten eski değil mi
+      // actualEndTime varsa yayın bitmiş demektir — publishedAt güvenilmez (video oluşturma tarihi)
       const apiSaysLive = item.snippet?.liveBroadcastContent === 'live';
       const hasEnded = !!item.liveStreamingDetails?.actualEndTime;
-      const publishedAge = Date.now() - new Date(item.snippet?.publishedAt || 0).getTime();
-      const isTooOld = publishedAge > 12 * 60 * 60 * 1000; // 12 saat
-      const isLive = apiSaysLive && !hasEnded && !isTooOld;
+      const isLive = apiSaysLive && !hasEnded;
       const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
@@ -357,12 +355,10 @@ export async function searchChannelVideos(
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
       // YouTube API bazen bitmiş yayınları hâlâ 'live' olarak işaretliyor.
-      // 3 kontrol: 1) API live diyor mu, 2) actualEndTime yok mu, 3) 12 saatten eski değil mi
+      // actualEndTime varsa yayın bitmiş demektir — publishedAt güvenilmez (video oluşturma tarihi)
       const apiSaysLive = item.snippet?.liveBroadcastContent === 'live';
       const hasEnded = !!item.liveStreamingDetails?.actualEndTime;
-      const publishedAge = Date.now() - new Date(item.snippet?.publishedAt || 0).getTime();
-      const isTooOld = publishedAge > 12 * 60 * 60 * 1000; // 12 saat
-      const isLive = apiSaysLive && !hasEnded && !isTooOld;
+      const isLive = apiSaysLive && !hasEnded;
       const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
