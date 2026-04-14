@@ -65,7 +65,10 @@ export async function GET(request: NextRequest) {
     }
 
     // =============================================
-    // FALLBACK: YouTube boş döndüyse → Supabase videos tablosu
+    // MERGE: YouTube API + Supabase videos tablosu
+    // YouTube playlistItems API bazen stale veri döndürebilir.
+    // RSS cron tabanlı videos tablosu daha güncel olabilir.
+    // Her iki kaynağı merge edip en taze listeyi oluştur.
     // =============================================
     if (!videos || videos.length === 0) {
       console.log('YouTube API returned empty, falling back to videos DB table');
@@ -73,6 +76,31 @@ export async function GET(request: NextRequest) {
     } else {
       // Başarılı fetch → arşive kaydet (fire-and-forget, response'u yavaşlatmaz)
       saveVideosToDB(videos).catch(() => {});
+
+      // DB'den de al ve merge et — RSS cron daha taze veri bulmuş olabilir
+      try {
+        const dbVideos = await getVideosFromDB(channelIds, maxResults * channelIds.length);
+        if (dbVideos && dbVideos.length > 0) {
+          // API'dan gelen video ID'leri
+          const apiIdSet = new Set(videos.map((v: any) => v.id || v.ytVideoId));
+          // DB'de olup API'da olmayan yeni videoları ekle
+          const extraVideos = dbVideos.filter((dbv: any) => !apiIdSet.has(dbv.id));
+          if (extraVideos.length > 0) {
+            console.log(`DB merge: found ${extraVideos.length} extra videos from RSS cron not in YouTube API`);
+            videos = [...videos, ...extraVideos];
+            // Merge sonrası yeniden sırala: live first, then by date
+            videos.sort((a: any, b: any) => {
+              if (a.live && !b.live) return -1;
+              if (!a.live && b.live) return 1;
+              const dateA = new Date(a.publishedAt || a.published_at || 0).getTime();
+              const dateB = new Date(b.publishedAt || b.published_at || 0).getTime();
+              return dateB - dateA;
+            });
+          }
+        }
+      } catch {
+        // DB merge başarısız — YouTube API verisi yeterli
+      }
     }
 
     // Cache header: CDN ve tarayıcı cache — gereksiz API çağrılarını azaltır

@@ -183,6 +183,39 @@ async function setCache(key: string, data: Video[], ttlHours: number = 2): Promi
 }
 
 // =============================================
+// RSS FEED — ÜCRETSİZ VİDEO ID KAYNAĞI
+// YouTube playlistItems API bazen stale veri döndürebilir.
+// RSS feed her zaman güncel — kota yemez, hızlı!
+// playlistItems'tan gelen ID'lerle merge edilerek
+// her zaman en taze videoları yakalarız.
+// =============================================
+async function fetchRSSVideoIds(channelId: string): Promise<string[]> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch(
+      `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
+      {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ZapTube/1.0)' },
+        signal: controller.signal,
+      }
+    );
+    clearTimeout(timeout);
+    if (!res.ok) return [];
+    const xml = await res.text();
+    const ids: string[] = [];
+    const regex = /<yt:videoId>([^<]+)<\/yt:videoId>/g;
+    let match;
+    while ((match = regex.exec(xml)) !== null) {
+      ids.push(match[1]);
+    }
+    return ids; // En son 15 video (YouTube RSS varsayılanı)
+  } catch {
+    return []; // Timeout veya hata — sessizce devam
+  }
+}
+
+// =============================================
 // ⚡ SMART PLAYLIST DERIVATION — NO API CALL!
 // YouTube rule: uploads playlist = "UU" + channelId.substring(2)
 // This saves 1 API credit per channel every time!
@@ -243,16 +276,31 @@ async function fetchChannelUploads(
     const playlistData = await playlistRes.json();
     const items = playlistData.items || [];
 
-    if (items.length === 0) return [];
+    // Step 2.5: RSS feed'den de video ID'leri al (ÜCRETSİZ!)
+    // playlistItems API bazen stale veri döndürebilir,
+    // RSS her zaman güncel. İkisini merge edip en taze listeyi oluştur.
+    const playlistVideoIds: string[] = items
+      .map((item: any) => item.snippet?.resourceId?.videoId)
+      .filter(Boolean);
+
+    const rssVideoIds = await fetchRSSVideoIds(channelId);
+
+    // Merge: önce playlist ID'leri, sonra RSS'ten gelip playlist'te olmayanlar
+    const mergedIdSet = new Set(playlistVideoIds);
+    for (const rssId of rssVideoIds) {
+      mergedIdSet.add(rssId);
+    }
+    const allVideoIds = Array.from(mergedIdSet);
+
+    if (allVideoIds.length === 0) return [];
+
+    if (rssVideoIds.length > 0 && rssVideoIds.some(id => !playlistVideoIds.includes(id))) {
+      console.log(`RSS found ${rssVideoIds.filter(id => !playlistVideoIds.includes(id)).length} extra videos for ${channelId} not in playlistItems`);
+    }
 
     // Step 3: Get video details for statistics + live info
     // Batch all IDs into ONE call (saves quota!)
-    const videoIds = items
-      .map((item: any) => item.snippet?.resourceId?.videoId)
-      .filter(Boolean)
-      .join(',');
-
-    if (!videoIds) return [];
+    const videoIds = allVideoIds.join(',');
 
     const detailsRes = await fetch(
       `${YOUTUBE_API_BASE}/videos?` +
