@@ -215,10 +215,14 @@ async function fetchChannelUploads(
     );
 
     if (!playlistRes.ok) {
-      console.error(`PlaylistItems failed for ${channelId}:`, playlistRes.status);
-      // API hata verdi — cache'de eski veri varsa onu dön
+      const errorBody = await playlistRes.text().catch(() => '');
+      console.error(`PlaylistItems failed for ${channelId}: status=${playlistRes.status} body=${errorBody.substring(0, 200)}`);
+      // API hata verdi — cache'de eski veri varsa onu dön ama _stale işaretle
       const fallback = await getUploadsCacheFallback(channelId);
-      return fallback || [];
+      if (fallback) {
+        return fallback.map(v => ({ ...v, _fromStaleCache: true } as any));
+      }
+      return [];
     }
 
     const playlistData = await playlistRes.json();
@@ -247,14 +251,23 @@ async function fetchChannelUploads(
     if (!detailsRes.ok) {
       console.error('Video details failed:', detailsRes.status);
       const fallback = await getUploadsCacheFallback(channelId);
-      return fallback || [];
+      if (fallback) {
+        return fallback.map(v => ({ ...v, _fromStaleCache: true } as any));
+      }
+      return [];
     }
 
     const detailsData = await detailsRes.json();
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
-      // YouTube ne diyorsa o — bayat temizliği DB tarafında yapılıyor
-      const isLive = item.snippet?.liveBroadcastContent === 'live';
+      // Gerçek canlı yayın tespiti:
+      // 1. liveBroadcastContent === 'live' VE
+      // 2. actualEndTime YOKSA (yayın bitmemiş) VE
+      // 3. actualStartTime VARSA (yayın başlamış)
+      // Bu 3 koşul bitmiş eski yayınların "CANLI" gösterilmesini engeller.
+      const lbc = item.snippet?.liveBroadcastContent;
+      const lsd = item.liveStreamingDetails;
+      const isLive = lbc === 'live' && !lsd?.actualEndTime && !!lsd?.actualStartTime;
       const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
@@ -267,7 +280,7 @@ async function fetchChannelUploads(
           '',
         publishedAt: item.snippet.publishedAt,
         viewCount: isLive
-          ? item.liveStreamingDetails?.concurrentViewers || item.statistics?.viewCount
+          ? lsd?.concurrentViewers || item.statistics?.viewCount
           : item.statistics?.viewCount,
         duration: isLive ? 'CANLI' : dur.formatted,
         durationSeconds: isLive ? 0 : dur.seconds,
@@ -281,20 +294,20 @@ async function fetchChannelUploads(
     if (videos.length === 0) return videos;
 
     // Saate göre akıllı cache — canlı yayınları kaçırmamak için prime time'da kısa
-    // 02-10: 4 saat  — kimse video yüklemez, ölü saat
-    // 10-17: 1 saat  — gündüz video yükleme aktif
+    // 02-10: 2 saat  — kimse video yüklemez, ölü saat
+    // 10-17: 30 dk   — gündüz video yükleme aktif
     // 17-02: 15 dk   — prime time, canlı yayınları hemen yakala!
     const uploadHour = new Date().getHours();
-    const uploadCacheTTL = (uploadHour >= 2 && uploadHour < 10) ? 4 : (uploadHour >= 10 && uploadHour < 17) ? 1 : 15 / 60;
+    const uploadCacheTTL = (uploadHour >= 2 && uploadHour < 10) ? 2 : (uploadHour >= 10 && uploadHour < 17) ? 0.5 : 15 / 60;
     await setCache(cacheKey, videos, uploadCacheTTL);
     return videos;
   } catch (error) {
     console.error('fetchChannelUploads error:', error);
-    // API hata verdi — cache'de farklı key ile eski veri varsa onu dön
+    // API hata verdi — cache'de farklı key ile eski veri varsa onu dön ama _stale işaretle
     const fallback = await getUploadsCacheFallback(channelId);
     if (fallback && fallback.length > 0) {
       console.log(`Using fallback cache for ${channelId} (${fallback.length} videos)`);
-      return fallback;
+      return fallback.map(v => ({ ...v, _fromStaleCache: true } as any));
     }
     return [];
   }
@@ -351,8 +364,10 @@ export async function searchChannelVideos(
     const detailsData = await detailsRes.json();
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
-      // YouTube ne diyorsa o — bayat temizliği DB tarafında yapılıyor
-      const isLive = item.snippet?.liveBroadcastContent === 'live';
+      // Gerçek canlı yayın tespiti (fetchChannelUploads ile aynı mantık)
+      const lbc = item.snippet?.liveBroadcastContent;
+      const lsd = item.liveStreamingDetails;
+      const isLive = lbc === 'live' && !lsd?.actualEndTime && !!lsd?.actualStartTime;
       const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
@@ -365,7 +380,7 @@ export async function searchChannelVideos(
           '',
         publishedAt: item.snippet.publishedAt,
         viewCount: isLive
-          ? item.liveStreamingDetails?.concurrentViewers || item.statistics?.viewCount
+          ? lsd?.concurrentViewers || item.statistics?.viewCount
           : item.statistics?.viewCount,
         duration: isLive ? 'CANLI' : dur.formatted,
         durationSeconds: isLive ? 0 : dur.seconds,
@@ -436,14 +451,22 @@ export async function getMultiChannelVideos(
   const cached = await getCached(cacheKey);
   if (cached) return cached;
 
-  // Fetch uploads from all channels in parallel
-  // fetchChannelUploads zaten liveBroadcastContent === 'live' kontrolü yapıyor
-  // Canlı yayınlar otomatik olarak live: true ile işaretleniyor
-  // maxPerChannel'den daha fazla çekelim ki canlı yayınları kaçırmayalım
+  // Kanalları küçük gruplar halinde çek — YouTube rate limit'e takılmamak için
+  // 23 kanalı aynı anda çekmek yerine 5'erli batch'ler halinde çek
   const fetchCount = Math.max(maxPerChannel, 10); // en az 10 video çek
-  const uploadsResults = await Promise.allSettled(
-    channelIds.map((id) => fetchChannelUploads(id, apiKey, fetchCount))
-  );
+  const BATCH_SIZE = 5;
+  const uploadsResults: PromiseSettledResult<Video[]>[] = [];
+  for (let i = 0; i < channelIds.length; i += BATCH_SIZE) {
+    const batch = channelIds.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.allSettled(
+      batch.map((id) => fetchChannelUploads(id, apiKey, fetchCount))
+    );
+    uploadsResults.push(...batchResults);
+    // Batch'ler arası kısa bekleme — rate limit koruması
+    if (i + BATCH_SIZE < channelIds.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
 
   const allVideos: Video[] = [];
 
@@ -454,9 +477,18 @@ export async function getMultiChannelVideos(
     }
   });
 
+  // Stale fallback verilerini ayır — bunlar cache'e yazılmamalı
+  const hasStaleData = allVideos.some((v: any) => v._fromStaleCache);
+
+  // _fromStaleCache işaretini temizle (client'a gitmemeli)
+  const cleanVideos = allVideos.map((v: any) => {
+    const { _fromStaleCache, ...clean } = v;
+    return clean as Video;
+  });
+
   // Deduplicate — live streams might also appear in uploads
   const seen = new Set<string>();
-  const deduped = allVideos.filter((v) => {
+  const deduped = cleanVideos.filter((v) => {
     const key = v.ytVideoId || v.id;
     if (seen.has(key)) return false;
     seen.add(key);
@@ -471,17 +503,20 @@ export async function getMultiChannelVideos(
   });
 
   // KRİTİK: Boş sonucu ASLA cache'leme!
-  // YouTube API kota aşımı veya hata döndüğünde boş sonuç gelir.
-  // Bunu cache'lersek, sonraki pollarda da boş dönecek ve kullanıcı
-  // video göremeyecek. Cache'lemezek, sonraki poll tekrar dener.
   if (sorted.length === 0) {
     // SON ÇARE: Süresi dolmuş eski cache'den veri getir
-    // Boş ekran göstermektense eski video listesini göster!
     const stale = await getStaleCacheFallback(`multi:`);
     if (stale && stale.length > 0) {
       console.log(`All APIs failed, using stale cache (${stale.length} videos)`);
       return stale;
     }
+    return sorted;
+  }
+
+  // KRİTİK: Stale fallback verisi içeren sonuçları CACHE'LEME!
+  // Yoksa eski veri sürekli geri döngüye giriyor.
+  if (hasStaleData) {
+    console.warn(`Multi-channel result contains stale fallback data — NOT caching to prevent stale loop`);
     return sorted;
   }
 
