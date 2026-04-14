@@ -12,7 +12,7 @@ const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
 // L1: In-memory cache
 const videoCache = new Map<string, { data: Video[]; timestamp: number }>();
-const VIDEO_CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours — kota tasarrufu
+const VIDEO_CACHE_TTL = 15 * 60 * 1000; // 15 min — L2 ile uyumlu, stale döngüsünü kırar
 
 // Uploads playlist ID cache (UC→UU conversion, NO API call needed!)
 const uploadsPlaylistCache = new Map<string, string>();
@@ -254,7 +254,7 @@ async function fetchChannelUploads(
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
       // YouTube ne diyorsa o — bayat temizliği DB tarafında yapılıyor
-      const isLive = item.snippet?.liveBroadcastContent === 'live' && (Date.now() - new Date(item.snippet?.publishedAt || 0).getTime()) < 43200000;
+      const isLive = item.snippet?.liveBroadcastContent === 'live';
       const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
@@ -352,7 +352,7 @@ export async function searchChannelVideos(
 
     const videos: Video[] = (detailsData.items || []).map((item: any) => {
       // YouTube ne diyorsa o — bayat temizliği DB tarafında yapılıyor
-      const isLive = item.snippet?.liveBroadcastContent === 'live' && (Date.now() - new Date(item.snippet?.publishedAt || 0).getTime()) < 43200000;
+      const isLive = item.snippet?.liveBroadcastContent === 'live';
       const dur = parseDuration(item.contentDetails?.duration);
       return {
         id: item.id,
