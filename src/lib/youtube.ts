@@ -4,6 +4,17 @@ import { createClient } from '@/lib/supabase';
 const YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3';
 
 // =============================================
+// CACHE VERSION — Deployment değişince eski cache geçersiz olur
+// Vercel her deployment'ta VERCEL_GIT_COMMIT_SHA verir.
+// Cache key'e eklenerek eski lambda'nın yazdığı stale veri
+// yeni deployment tarafından otomatik olarak reddedilir.
+// =============================================
+const DEPLOY_SHA = (process.env.VERCEL_GIT_COMMIT_SHA || 'dev').substring(0, 8);
+function versionedKey(key: string): string {
+  return `${DEPLOY_SHA}:${key}`;
+}
+
+// =============================================
 // 3-LEVEL CACHE SYSTEM
 // L1: In-memory (instant, same session)
 // L2: Supabase DB (persistent, survives restarts)
@@ -44,7 +55,8 @@ function setL1Cache(key: string, data: Video[]): void {
 async function getL2Cache(key: string): Promise<Video[] | null> {
   try {
     const supabase = createClient();
-    const { data, error } = await supabase.rpc('get_video_cache', { p_key: key });
+    // Versiyonlu key — eski deployment'ın cache'ini okumaz
+    const { data, error } = await supabase.rpc('get_video_cache', { p_key: versionedKey(key) });
 
     if (error || !data) return null;
     // Data might be a JSON string (double-stringify issue) or already parsed
@@ -59,8 +71,9 @@ async function getL2Cache(key: string): Promise<Video[] | null> {
 async function setL2Cache(key: string, videos: Video[], ttlHours: number = 2): Promise<void> {
   try {
     const supabase = createClient();
+    // Versiyonlu key — bu deployment'a özel
     await supabase.rpc('set_video_cache', {
-      p_key: key,
+      p_key: versionedKey(key),
       p_data: videos,
       p_ttl_hours: ttlHours,
     });
@@ -94,10 +107,11 @@ async function getCached(key: string): Promise<Video[] | null> {
 async function getStaleCacheFallback(keyPrefix: string): Promise<Video[] | null> {
   try {
     const supabase = createClient();
+    // Versiyonlu prefix — sadece bu deployment'ın verisini ara
     const { data, error } = await supabase
       .from('video_cache')
       .select('data')
-      .like('cache_key', `${keyPrefix}%`)
+      .like('cache_key', `${DEPLOY_SHA}:${keyPrefix}%`)
       .order('expires_at', { ascending: false })
       .limit(1);
 
@@ -123,11 +137,11 @@ async function getUploadsCacheFallback(channelId: string): Promise<Video[] | nul
   try {
     const supabase = createClient();
 
-    // 1. Önce süresi dolmamış cache dene
+    // 1. Önce süresi dolmamış cache dene (versiyonlu key)
     const { data, error } = await supabase
       .from('video_cache')
       .select('data')
-      .like('cache_key', `uploads:${channelId}:%`)
+      .like('cache_key', `${DEPLOY_SHA}:uploads:${channelId}:%`)
       .gt('expires_at', new Date().toISOString())
       .limit(1);
 
@@ -138,10 +152,11 @@ async function getUploadsCacheFallback(channelId: string): Promise<Video[] | nul
     }
 
     // 2. Süresi dolmuş eski veriyi de kabul et — boş ekran göstermektense!
+    // Versiyon prefix'siz ara — herhangi bir deployment'ın verisini kabul et
     const { data: staleData, error: staleError } = await supabase
       .from('video_cache')
       .select('data')
-      .like('cache_key', `uploads:${channelId}:%`)
+      .like('cache_key', `%uploads:${channelId}:%`)
       .order('expires_at', { ascending: false })
       .limit(1);
 

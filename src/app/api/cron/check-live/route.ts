@@ -95,7 +95,10 @@ async function checkLiveStatus(
       const data = await res.json();
 
       for (const item of data.items || []) {
-        const isLive = item.snippet?.liveBroadcastContent === 'live';
+        // Gerçek canlı yayın tespiti — bitmiş yayınları filtreleme
+        const lbc = item.snippet?.liveBroadcastContent;
+        const lsd = item.liveStreamingDetails;
+        const isLive = lbc === 'live' && !lsd?.actualEndTime && !!lsd?.actualStartTime;
         result.set(item.id, {
           isLive,
           liveTitle: isLive ? item.snippet?.title : undefined,
