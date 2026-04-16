@@ -23,7 +23,13 @@ function versionedKey(key: string): string {
 
 // L1: In-memory cache
 const videoCache = new Map<string, { data: Video[]; timestamp: number }>();
-const VIDEO_CACHE_TTL = 15 * 60 * 1000; // 15 min — L2 ile uyumlu, stale döngüsünü kırar
+// L1 TTL saate göre dinamik — getL1TTL() ile hesaplanır
+function getL1TTL(): number {
+  const hour = new Date().getHours();
+  if (hour >= 2 && hour < 10) return 30 * 60 * 1000;  // Gece: 30 dk
+  if (hour >= 10 && hour < 17) return 5 * 60 * 1000;   // Gündüz: 5 dk
+  return 3 * 60 * 1000;                                  // Prime time: 3 dk
+}
 
 // Uploads playlist ID cache (UC→UU conversion, NO API call needed!)
 const uploadsPlaylistCache = new Map<string, string>();
@@ -38,7 +44,7 @@ const STATS_CACHE_TTL = 8 * 60 * 60 * 1000; // 8 hours — kota tasarrufu
 function getL1Cache(key: string): Video[] | null {
   const entry = videoCache.get(key);
   if (!entry) return null;
-  if (Date.now() - entry.timestamp > VIDEO_CACHE_TTL) {
+  if (Date.now() - entry.timestamp > getL1TTL()) {
     videoCache.delete(key);
     return null;
   }
@@ -511,8 +517,13 @@ export async function getMultiChannelVideos(
   maxPerChannel: number = 4
 ): Promise<Video[]> {
   const cacheKey = `multi:${channelIds.sort().join(',')}:${maxPerChannel}`;
-  const cached = await getCached(cacheKey);
-  if (cached) return cached;
+  // Multi-channel sonucu SADECE L1 (in-memory) cache'te tut!
+  // L2 (Supabase) cache yazılmıyor çünkü:
+  // 1. Bireysel kanal cache'leri zaten L2'de — her kanal bağımsız tazeleşir
+  // 2. Multi-channel L2 cache, bir kanal güncellendiğinde diğerlerini de eski tutuyor
+  // 3. L1 cache lambda ömrüyle sınırlı — cold start = taze veri
+  const l1 = getL1Cache(cacheKey);
+  if (l1) return l1;
 
   // Kanalları küçük gruplar halinde çek — YouTube rate limit'e takılmamak için
   // 23 kanalı aynı anda çekmek yerine 5'erli batch'ler halinde çek
@@ -583,13 +594,10 @@ export async function getMultiChannelVideos(
     return sorted;
   }
 
-  // Akıllı multi-channel cache
-  const hasLive = sorted.some(v => v.live);
-  const multiHour = new Date().getHours();
-  const noLiveTTL = (multiHour >= 2 && multiHour < 10) ? 2        // 2 saat — gece ölü saat
-    : (multiHour >= 10 && multiHour < 17) ? 15 / 60               // 15 dk — gündüz
-    : 5 / 60;                                                       // 5 dk — prime time (17-02)
-  await setCache(cacheKey, sorted, hasLive ? getLiveCacheTTL() : noLiveTTL);
+  // Multi-channel sonucu SADECE L1 cache'e yaz (L2 yok!)
+  // Bireysel kanallar zaten L2'de cache'li — multi-channel L2 gereksiz katman
+  // L1 TTL 15 dk — lambda ölünce cache gider, sonraki istek taze veri alır
+  setL1Cache(cacheKey, sorted);
   return sorted;
 }
 
