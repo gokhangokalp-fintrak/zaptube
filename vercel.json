@@ -1,8 +1,12 @@
 {
   "crons": [
     {
+      "path": "/api/cron/fetch-rss",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/check-live",
-      "schedule": "0 5 * * *"
+      "schedule": "*/3 * * * *"
     }
   ]
 }

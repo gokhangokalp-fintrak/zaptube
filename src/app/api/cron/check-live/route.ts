@@ -32,7 +32,7 @@ async function fetchRSSVideoIds(channelId: string): Promise<RSSVideo[]> {
   try {
     const res = await fetch(
       `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
-      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ZapTube/1.0)' } }
+      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ZapTube/1.0)' }, cache: 'no-store' as RequestCache }
     );
     if (!res.ok) return [];
     const xml = await res.text();
@@ -87,7 +87,7 @@ async function checkLiveStatus(
     const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${batch.join(',')}&key=${apiKey}`;
 
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) {
         console.error(`YouTube API error: ${res.status}`);
         continue;

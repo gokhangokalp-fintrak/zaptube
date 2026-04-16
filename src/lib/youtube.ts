@@ -204,6 +204,7 @@ async function fetchRSSVideoIds(channelId: string): Promise<string[]> {
       {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ZapTube/1.0)' },
         signal: controller.signal,
+        cache: 'no-store', // Next.js fetch cache'ini devre dışı bırak — her zaman taze RSS
       }
     );
     clearTimeout(timeout);
@@ -265,7 +266,8 @@ async function fetchChannelUploads(
           playlistId,
           maxResults: maxResults.toString(),
           key: apiKey,
-        })
+        }),
+      { cache: 'no-store' } // Next.js fetch cache devre dışı
     );
 
     if (!playlistRes.ok) {
@@ -314,7 +316,8 @@ async function fetchChannelUploads(
           part: 'snippet,statistics,contentDetails,liveStreamingDetails',
           id: videoIds,
           key: apiKey,
-        })
+        }),
+      { cache: 'no-store' } // Next.js fetch cache devre dışı
     );
 
     if (!detailsRes.ok) {
@@ -416,7 +419,7 @@ export async function searchChannelVideos(
       params.set('q', query);
     }
 
-    const searchRes = await fetch(`${YOUTUBE_API_BASE}/search?${params}`);
+    const searchRes = await fetch(`${YOUTUBE_API_BASE}/search?${params}`, { cache: 'no-store' });
     if (!searchRes.ok) throw new Error('YouTube API search failed');
     const searchData = await searchRes.json();
 
@@ -428,7 +431,8 @@ export async function searchChannelVideos(
     if (!videoIds) return [];
 
     const detailsRes = await fetch(
-      `${YOUTUBE_API_BASE}/videos?part=snippet,statistics,contentDetails,liveStreamingDetails&id=${videoIds}&key=${apiKey}`
+      `${YOUTUBE_API_BASE}/videos?part=snippet,statistics,contentDetails,liveStreamingDetails&id=${videoIds}&key=${apiKey}`,
+      { cache: 'no-store' }
     );
     const detailsData = await detailsRes.json();
 

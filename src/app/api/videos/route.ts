@@ -74,19 +74,28 @@ export async function GET(request: NextRequest) {
       console.log('YouTube API returned empty, falling back to videos DB table');
       videos = await getVideosFromDB(channelIds, maxResults * channelIds.length);
     } else {
-      // Başarılı fetch → arşive kaydet (fire-and-forget, response'u yavaşlatmaz)
-      saveVideosToDB(videos).catch(() => {});
-
       // DB'den de al ve merge et — RSS cron daha taze veri bulmuş olabilir
+      // ÖNCELİK: DB merge'ü saveVideosToDB'den ÖNCE yap!
+      // Yoksa fire-and-forget upsert DB'yi kilitleyebiliyor.
       try {
-        const dbVideos = await getVideosFromDB(channelIds, maxResults * channelIds.length);
+        // Daha geniş limit: her kanal için 10 video
+        const dbLimit = Math.max(maxResults * channelIds.length, channelIds.length * 10);
+        const dbVideos = await getVideosFromDB(channelIds, dbLimit);
+        console.log(`DB merge: getVideosFromDB returned ${dbVideos?.length ?? 0} videos for ${channelIds.length} channels (limit=${dbLimit})`);
         if (dbVideos && dbVideos.length > 0) {
           // API'dan gelen video ID'leri
           const apiIdSet = new Set(videos.map((v: any) => v.id || v.ytVideoId));
           // DB'de olup API'da olmayan yeni videoları ekle
           const extraVideos = dbVideos.filter((dbv: any) => !apiIdSet.has(dbv.id));
+          console.log(`DB merge: API has ${apiIdSet.size} unique IDs, DB has ${dbVideos.length} videos, found ${extraVideos.length} extras`);
           if (extraVideos.length > 0) {
-            console.log(`DB merge: found ${extraVideos.length} extra videos from RSS cron not in YouTube API`);
+            // En taze extra'ları logla
+            const newestExtra = extraVideos.reduce((a: any, b: any) => {
+              const da = new Date(a.publishedAt || a.published_at || 0).getTime();
+              const db = new Date(b.publishedAt || b.published_at || 0).getTime();
+              return da > db ? a : b;
+            });
+            console.log(`DB merge: newest extra video: ${newestExtra.title?.substring(0, 50)} (${newestExtra.publishedAt || newestExtra.published_at})`);
             videos = [...videos, ...extraVideos];
             // Merge sonrası yeniden sırala: live first, then by date
             videos.sort((a: any, b: any) => {
@@ -98,9 +107,13 @@ export async function GET(request: NextRequest) {
             });
           }
         }
-      } catch {
-        // DB merge başarısız — YouTube API verisi yeterli
+      } catch (dbMergeError) {
+        console.error('DB merge failed:', dbMergeError);
       }
+
+      // Başarılı fetch → arşive kaydet (fire-and-forget, response'u yavaşlatmaz)
+      // DB merge'den SONRA yap — merge sırasında DB'yi kilitlemesini engelle
+      saveVideosToDB(videos).catch(() => {});
     }
 
     // Cache header: CDN ve tarayıcı cache — gereksiz API çağrılarını azaltır
