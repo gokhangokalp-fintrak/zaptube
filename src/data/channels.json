@@ -7,8 +7,8 @@
       "description": "Futbol odaklı dijital içerik üreticisi. Analiz ve yorumlar.",
       "thumbnail": "/images/channels/343digital.jpg",
       "teams": ["genel"],
-      "contentTypes": ["analiz", "yorum"],
-      "tags": ["dijital", "analiz", "yorum"],
+      "contentTypes": ["analiz","yorum"],
+      "tags": ["dijital","analiz","yorum"],
       "priority": 1
     },
     {
@@ -18,8 +18,8 @@
       "description": "Taktik analiz uzmanı. Maçları derinlemesine analiz eder.",
       "thumbnail": "/images/channels/ugur.jpg",
       "teams": ["genel"],
-      "contentTypes": ["analiz", "taktik"],
-      "tags": ["taktik", "analiz", "detaylı"],
+      "contentTypes": ["analiz","taktik"],
+      "tags": ["taktik","analiz","detaylı"],
       "priority": 1
     },
     {
@@ -29,8 +29,8 @@
       "description": "Spor kültürü ve futbol üzerine derinlemesine içerikler, belgeseller.",
       "thumbnail": "/images/channels/socrates.jpg",
       "teams": ["genel"],
-      "contentTypes": ["yorum", "analiz"],
-      "tags": ["spor kültürü", "analiz", "belgesel"],
+      "contentTypes": ["yorum","analiz"],
+      "tags": ["spor kültürü","analiz","belgesel"],
       "priority": 2
     },
     {
@@ -40,8 +40,8 @@
       "description": "Sahadan haberler, röportajlar ve maç analizleri.",
       "thumbnail": "/images/channels/sahaici.jpg",
       "teams": ["genel"],
-      "contentTypes": ["yorum", "analiz", "canli-yayin"],
-      "tags": ["saha", "röportaj", "haber"],
+      "contentTypes": ["yorum","analiz","canli-yayin"],
+      "tags": ["saha","röportaj","haber"],
       "priority": 2
     },
     {
@@ -51,8 +51,8 @@
       "description": "NOW TV spor kanalı. Güncel haberler, maç analizleri ve yorumlar.",
       "thumbnail": "/images/channels/nowspor.jpg",
       "teams": ["genel"],
-      "contentTypes": ["yorum", "analiz", "sert-yorum"],
-      "tags": ["now", "haber", "yorum"],
+      "contentTypes": ["yorum","analiz","sert-yorum"],
+      "tags": ["now","haber","yorum"],
       "priority": 1
     },
     {
@@ -62,8 +62,8 @@
       "description": "Futbol sohbetleri ve yorumlar. Samimi ve eğlenceli içerikler.",
       "thumbnail": "/images/channels/eskiacik.jpg",
       "teams": ["genel"],
-      "contentTypes": ["yorum", "eglence", "canli-yayin"],
-      "tags": ["sohbet", "eğlence", "samimi"],
+      "contentTypes": ["yorum","eglence","canli-yayin"],
+      "tags": ["sohbet","eğlence","samimi"],
       "priority": 2
     },
     {
@@ -73,8 +73,8 @@
       "description": "Spor haberleri ve yorumları. Güncel futbol içerikleri.",
       "thumbnail": "/images/channels/neospor.jpg",
       "teams": ["genel"],
-      "contentTypes": ["yorum", "analiz", "canli-yayin"],
-      "tags": ["spor", "haber", "yorum"],
+      "contentTypes": ["yorum","analiz","canli-yayin"],
+      "tags": ["spor","haber","yorum"],
       "priority": 2
     },
     {
@@ -84,8 +84,8 @@
       "description": "Futbol tartışmaları ve sohbetler. Eğlenceli ve bilgilendirici içerikler.",
       "thumbnail": "/images/channels/htalks.jpg",
       "teams": ["genel"],
-      "contentTypes": ["yorum", "eglence", "canli-yayin"],
-      "tags": ["sohbet", "tartışma", "eğlence"],
+      "contentTypes": ["yorum","eglence","canli-yayin"],
+      "tags": ["sohbet","tartışma","eğlence"],
       "priority": 2
     },
     {
@@ -95,8 +95,8 @@
       "description": "Kontra atak gibi keskin yorumlar. Futbol analizleri ve tartışmalar.",
       "thumbnail": "/images/channels/kontraspor.jpg",
       "teams": ["genel"],
-      "contentTypes": ["analiz", "yorum", "sert-yorum"],
-      "tags": ["analiz", "tartışma", "keskin"],
+      "contentTypes": ["analiz","yorum","sert-yorum"],
+      "tags": ["analiz","tartışma","keskin"],
       "priority": 1
     },
     {
@@ -106,8 +106,8 @@
       "description": "Ertem Şener ve ekibi. Canlı yayınlar, maç yorumları ve tartışmalar.",
       "thumbnail": "/images/channels/vole.jpg",
       "teams": ["genel"],
-      "contentTypes": ["yorum", "sert-yorum", "canli-yayin"],
-      "tags": ["canlı", "tartışma", "yorum"],
+      "contentTypes": ["yorum","sert-yorum","canli-yayin"],
+      "tags": ["canlı","tartışma","yorum"],
       "priority": 1
     },
     {
@@ -117,8 +117,8 @@
       "description": "Transfer haberleri ve iç sahadan bilgiler. Türkiye'nin en güvenilir transfer muhabirlerinden.",
       "thumbnail": "/images/channels/yagiz.jpg",
       "teams": ["genel"],
-      "contentTypes": ["yorum", "analiz"],
-      "tags": ["transfer", "haber", "muhabir"],
+      "contentTypes": ["yorum","analiz"],
+      "tags": ["transfer","haber","muhabir"],
       "priority": 1
     },
     {
@@ -128,8 +128,8 @@
       "description": "Galatasaray resmi YouTube kanalı. Maç özetleri, röportajlar, GSTV özel içerikler.",
       "thumbnail": "/images/channels/gs.jpg",
       "teams": ["gs"],
-      "contentTypes": ["ozet", "yorum", "canli-yayin"],
-      "tags": ["gs", "resmi", "gstv"],
+      "contentTypes": ["ozet","yorum","canli-yayin"],
+      "tags": ["gs","resmi","gstv"],
       "priority": 1
     },
     {
@@ -139,8 +139,8 @@
       "description": "Futbol eğlencesi ve sohbetler. Farklı bakış açılarıyla spor yorumları.",
       "thumbnail": "/images/channels/kafasports.jpg",
       "teams": ["genel"],
-      "contentTypes": ["eglence", "yorum", "canli-yayin"],
-      "tags": ["eğlence", "sohbet", "farklı"],
+      "contentTypes": ["eglence","yorum","canli-yayin"],
+      "tags": ["eğlence","sohbet","farklı"],
       "priority": 2
     },
     {
@@ -150,8 +150,8 @@
       "description": "Futbol analizleri ve taktik değerlendirmeler. Farklı bir perspektif.",
       "thumbnail": "/images/channels/l1ucgen.jpg",
       "teams": ["genel"],
-      "contentTypes": ["analiz", "taktik", "yorum"],
-      "tags": ["taktik", "analiz", "perspektif"],
+      "contentTypes": ["analiz","taktik","yorum"],
+      "tags": ["taktik","analiz","perspektif"],
       "priority": 2
     },
     {
@@ -161,9 +161,119 @@
       "description": "Dijital spor içerikleri. Futbol haberleri ve analizler.",
       "thumbnail": "/images/channels/sportsdigitale.jpg",
       "teams": ["genel"],
-      "contentTypes": ["analiz", "yorum"],
-      "tags": ["dijital", "haber", "analiz"],
+      "contentTypes": ["analiz","yorum"],
+      "tags": ["dijital","haber","analiz"],
       "priority": 2
+    },
+    {
+      "id": "sporx",
+      "name": "Sporx",
+      "youtubeChannelId": "UCca15NopNEllzHOvRbFlwmQ",
+      "description": "Türkiye'nin en güçlü dijital spor platformu. Süper Lig analizleri, transfer haberleri ve özel programlar.",
+      "thumbnail": "/images/channels/sporx.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum","analiz","haber"],
+      "tags": ["sporx","haber","analiz","transfer"],
+      "priority": 1
+    },
+    {
+      "id": "fanatik",
+      "name": "Fanatik",
+      "youtubeChannelId": "UCqQGUDHgy2a2uYsdgQ4ZhjA",
+      "description": "Fanatik gazetesi YouTube kanalı. Süper Lig, transfer ve spor haberleri.",
+      "thumbnail": "/images/channels/fanatik.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum","haber","analiz"],
+      "tags": ["fanatik","gazete","haber","transfer"],
+      "priority": 1
+    },
+    {
+      "id": "asist-analiz",
+      "name": "Asist Analiz",
+      "youtubeChannelId": "UCkyMPrjYvghkJZblZyrl4hQ",
+      "description": "Tümer Metin ve ekibi ile futbol analizleri, maç değerlendirmeleri ve spor sohbetleri.",
+      "thumbnail": "/images/channels/asistanaliz.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["analiz","yorum","canli-yayin"],
+      "tags": ["tümer metin","analiz","yorum"],
+      "priority": 1
+    },
+    {
+      "id": "beyaz-futbol",
+      "name": "Beyaz Futbol",
+      "youtubeChannelId": "UCIu9zJq00ev2xj37kvyHtZQ",
+      "description": "Ahmet Çakar, Sinan Engin ve ekibi. Haftalık maç yorumları ve sert tartışmalar.",
+      "thumbnail": "/images/channels/beyazfutbol.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum","sert-yorum","canli-yayin"],
+      "tags": ["beyaz tv","ahmet çakar","tartışma"],
+      "priority": 1
+    },
+    {
+      "id": "a-spor",
+      "name": "A Spor",
+      "youtubeChannelId": "UCJElRTCNEmLemgirqvsW63Q",
+      "description": "A Spor resmi YouTube kanalı. Canlı yayın, maç özetleri, transfer haberleri ve analizler.",
+      "thumbnail": "/images/channels/aspor.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum","analiz","canli-yayin","haber"],
+      "tags": ["a spor","canlı","transfer","haber"],
+      "priority": 1
+    },
+    {
+      "id": "trt-spor",
+      "name": "TRT Spor",
+      "youtubeChannelId": "UCfYNqluOf8EbQkL44otydMw",
+      "description": "TRT Spor resmi YouTube kanalı. Milli maçlar, Süper Lig ve spor haberleri.",
+      "thumbnail": "/images/channels/trtspor.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum","analiz","canli-yayin","haber"],
+      "tags": ["trt","milli takım","süper lig"],
+      "priority": 1
+    },
+    {
+      "id": "sky-spor",
+      "name": "Sky Spor",
+      "youtubeChannelId": "UCEwn14riGehA3FFTu7e-Azg",
+      "description": "Spor haberleri, maç analizleri ve futbol tartışmaları.",
+      "thumbnail": "/images/channels/skyspor.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum","analiz","canli-yayin"],
+      "tags": ["sky spor","haber","analiz"],
+      "priority": 2
+    },
+    {
+      "id": "ht-spor",
+      "name": "HT Spor",
+      "youtubeChannelId": "UCK3mI2lsk3LSo8PBUc8JTSw",
+      "description": "Habertürk Spor YouTube kanalı. Güncel spor haberleri ve maç yorumları.",
+      "thumbnail": "/images/channels/htspor.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["yorum","analiz","haber"],
+      "tags": ["habertürk","spor","haber"],
+      "priority": 2
+    },
+    {
+      "id": "enis-kirazoglu",
+      "name": "Enis Kirazoğlu",
+      "youtubeChannelId": "UCXin0u5SrVEBjn5LhOoG97A",
+      "description": "Futbol kültürü, tarih ve eğlenceli spor içerikleri. Türkiye'nin en popüler spor YouTuber'larından.",
+      "thumbnail": "/images/channels/eniskirazoglu.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["eglence","yorum","analiz"],
+      "tags": ["youtuber","futbol kültürü","eğlence"],
+      "priority": 1
+    },
+    {
+      "id": "hodri-meydan",
+      "name": "Hodri Meydan",
+      "youtubeChannelId": "UCo4V66blwCzoTNMfQsV5VZg",
+      "description": "Futbol tartışmaları ve taraftar içerikleri. Eğlenceli ve heyecanlı spor videoları.",
+      "thumbnail": "/images/channels/hodrimeydan.jpg",
+      "teams": ["genel"],
+      "contentTypes": ["eglence","yorum","canli-yayin"],
+      "tags": ["taraftar","tartışma","eğlence"],
+      "priority": 1
     },
     {
       "id": "cnn-turk",
@@ -172,8 +282,8 @@
       "description": "CNN Türk resmi YouTube kanalı. 7/24 canlı haber yayını, son dakika haberleri ve gündem.",
       "thumbnail": "/images/channels/cnnturk.jpg",
       "teams": ["haber"],
-      "contentTypes": ["canli-yayin", "haber"],
-      "tags": ["haber", "canlı", "gündem", "son dakika"],
+      "contentTypes": ["canli-yayin","haber"],
+      "tags": ["haber","canlı","gündem","son dakika"],
       "priority": 1
     },
     {
@@ -183,8 +293,8 @@
       "description": "Haber Global resmi YouTube kanalı. Güncel haberler, canlı yayın ve özel programlar.",
       "thumbnail": "/images/channels/haberglobal.jpg",
       "teams": ["haber"],
-      "contentTypes": ["canli-yayin", "haber"],
-      "tags": ["haber", "canlı", "gündem"],
+      "contentTypes": ["canli-yayin","haber"],
+      "tags": ["haber","canlı","gündem"],
       "priority": 1
     },
     {
@@ -194,8 +304,8 @@
       "description": "TRT Haber resmi YouTube kanalı. Türkiye'nin kamu yayıncısı, 7/24 haber.",
       "thumbnail": "/images/channels/trthaber.jpg",
       "teams": ["haber"],
-      "contentTypes": ["canli-yayin", "haber"],
-      "tags": ["haber", "canlı", "kamu", "trt"],
+      "contentTypes": ["canli-yayin","haber"],
+      "tags": ["haber","canlı","kamu","trt"],
       "priority": 1
     },
     {
@@ -205,8 +315,8 @@
       "description": "Bloomberg HT resmi YouTube kanalı. Ekonomi, finans, piyasa haberleri ve analizler.",
       "thumbnail": "/images/channels/bloomberght.jpg",
       "teams": ["haber"],
-      "contentTypes": ["canli-yayin", "haber"],
-      "tags": ["ekonomi", "finans", "piyasa", "borsa"],
+      "contentTypes": ["canli-yayin","haber"],
+      "tags": ["ekonomi","finans","piyasa","borsa"],
       "priority": 1
     },
     {
@@ -216,8 +326,8 @@
       "description": "Sözcü TV resmi YouTube kanalı. Güncel haberler, tartışma programları ve canlı yayın.",
       "thumbnail": "/images/channels/sozcutv.jpg",
       "teams": ["haber"],
-      "contentTypes": ["canli-yayin", "haber"],
-      "tags": ["haber", "canlı", "gündem", "tartışma"],
+      "contentTypes": ["canli-yayin","haber"],
+      "tags": ["haber","canlı","gündem","tartışma"],
       "priority": 1
     },
     {
@@ -227,8 +337,8 @@
       "description": "Habertürk TV resmi YouTube kanalı. Son dakika haberleri, ekonomi ve gündem.",
       "thumbnail": "/images/channels/haberturktv.jpg",
       "teams": ["haber"],
-      "contentTypes": ["canli-yayin", "haber"],
-      "tags": ["haber", "canlı", "ekonomi", "gündem"],
+      "contentTypes": ["canli-yayin","haber"],
+      "tags": ["haber","canlı","ekonomi","gündem"],
       "priority": 1
     },
     {
@@ -238,8 +348,8 @@
       "description": "TV100 resmi YouTube kanalı. Güncel haberler, tartışma programları ve canlı yayın.",
       "thumbnail": "/images/channels/tv100.jpg",
       "teams": ["haber"],
-      "contentTypes": ["canli-yayin", "haber"],
-      "tags": ["haber", "canlı", "gündem"],
+      "contentTypes": ["canli-yayin","haber"],
+      "tags": ["haber","canlı","gündem"],
       "priority": 1
     },
     {
@@ -249,8 +359,8 @@
       "description": "Halk TV resmi YouTube kanalı. Güncel haberler, tartışma programları ve canlı yayın.",
       "thumbnail": "/images/channels/halktv.jpg",
       "teams": ["haber"],
-      "contentTypes": ["canli-yayin", "haber"],
-      "tags": ["haber", "canlı", "gündem", "tartışma"],
+      "contentTypes": ["canli-yayin","haber"],
+      "tags": ["haber","canlı","gündem","tartışma"],
       "priority": 1
     }
   ],
