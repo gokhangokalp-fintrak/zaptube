@@ -1,1 +1,36 @@
+name: ZapTube Cron Jobs
 
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch-rss:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch RSS Videos
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SITE_URL }}/api/cron/fetch-rss")
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+          echo "Status: $http_code"
+          echo "Response: $body"
+          if [ "$http_code" -ge 400 ]; then exit 1; fi
+
+  check-live:
+    runs-on: ubuntu-latest
+    needs: fetch-rss
+    steps:
+      - name: Check Live Streams
+        run: |
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SITE_URL }}/api/cron/check-live")
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+          echo "Status: $http_code"
+          echo "Response: $body"
+          if [ "$http_code" -ge 400 ]; then exit 1; fi
