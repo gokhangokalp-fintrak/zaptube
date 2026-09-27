@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
+
 export const viewport: Viewport = {
   themeColor: '#10b981',
   width: 'device-width',
@@ -14,7 +16,7 @@ export const metadata: Metadata = {
     'Türk futbol YouTube kanalları ve canlı haber TV\'leri tek bir platformda. Spor, haber, ekonomi — zap yap, doğru kanala ulaş!',
   keywords: ['türk futbol', 'youtube', 'haber', 'ekonomi', 'canlı tv', 'galatasaray', 'fenerbahçe', 'beşiktaş', 'trabzonspor', 'süper lig', 'cnn türk', 'bloomberg ht'],
   verification: {
-        google: 'lPKYY0R-Fc990zz7spiBTcB0Kqrh-UkFjRVFRYhaVIY',
+    google: 'lPKYY0R-Fc990zz7spiBTcB0Kqrh-UkFjRVFRYhaVIY',
   },
   appleWebApp: {
     capable: true,
@@ -50,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
       </head>
       <body className="min-h-screen bg-[#111827] antialiased">
+        <GoogleAnalytics />
         {children}
       </body>
     </html>
